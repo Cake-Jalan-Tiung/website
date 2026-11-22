@@ -1,17 +1,6 @@
-.blueBand {
-  display: flex;
-  justify-content: center;
-  padding: var(--cjt-space-xl) var(--cjt-space-md);
-}
+/* The forbidden ground fills the Verdict's stage. */
+.illegal { display: flex; justify-content: center; width: 100%; height: var(--cjt-stage-art); padding: var(--cjt-space-md); box-sizing: border-box; }
 
-.sizes { display: flex; align-items: flex-end; gap: var(--cjt-space-xl); flex-wrap: wrap; }
-.sizeStep { margin: 0; display: flex; flex-direction: column; gap: var(--cjt-space-sm); align-items: flex-start; }
-.sizeArt { display: flex; align-items: flex-end; }
-
-/* The forbidden ground fills the Verdict's stage; --art-h is the stage's own art height. */
-.illegal { display: flex; justify-content: center; width: 100%; height: var(--art-h); padding: var(--cjt-space-md); box-sizing: border-box; }
-
-.grounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--cjt-space-sm); }
 .groundTile {
   display: flex;
   flex-direction: column;
@@ -20,11 +9,7 @@
   min-height: 160px;
   padding: var(--cjt-space-md);
   box-sizing: border-box;
-  margin: 0;
 }
-.groundInks { display: flex; flex-direction: column; gap: 4px; }
-/* The ink name sits on the sample's baseline, one step down. */
-.groundInkName { font-size: var(--cjt-text-caption); }
 
 /* Grammar sheet 04 scale rows: 28 block padding */
 .scale { composes: list from '../system/components.module.css'; }
@@ -38,8 +23,6 @@
   flex-wrap: wrap;
   gap: var(--cjt-space-sm) var(--cjt-space-lg);
 }
-.boardWrap { max-width: 700px; }
-.form { max-width: 420px; }
 
 @media (max-width: 899px) {
   .scaleRow { flex-wrap: wrap; row-gap: var(--cjt-space-xs); }

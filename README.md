@@ -23,7 +23,9 @@ Each layer reads only the ones above it.
 4. **Primitives** (`src/system/`):
    - `Field` paints a flat field of one brand colour and tells what sits inside which ground it is on. Everything coloured is a `Field`.
    - `Type` sets one of the six steps. Its ink defaults to the ground's primary voice, and in development it logs an error for an ink that is illegal on its ground.
-   - `Sheet`, `Band`, `Stack`, `Row`, `Columns` lay pages out on the brand's spacing steps.
+   - `Page`, `Sheet`, `Band`, `Bar`, `Marquee`, `Stack`, `Row`, `Columns` lay pages out on the brand's spacing steps. A page is full-width bands and gutter-held sheets, one under another. `Page` keeps the header, the bar and the sign-off outside `<main>`. `Bar` stays at the top on one line and the page keeps anchors clear of it. `Marquee` passes its content in a loop; it stops under the pointer, on a tap and from its own keyboard button, and under reduced motion it stands still and scrolls by hand.
+   - `Stage` takes a `mark` to fill it at its drawn height; a stage grows for anything taller.
+   - `ink="secondary"` on any text is the ground's receding voice: muted on paper, ink at 60% where muted fails, warm grey on ink.
 5. **Brand components** (`src/system/components.tsx`, metrics in `components.module.css`):
 
 | Component | From Paper |
@@ -40,7 +42,10 @@ Each layer reads only the ones above it.
 | `BilingualLabel`, `StackedPair` | Grammar 15 middot pair and stacked pair |
 | `MenuBoard`, `Price`, `PinkDot` | Mock up 03 menu board |
 
-6. **Pages.** The site (`index.html` → `src/site/`), the specimen (`design-system.html` → `src/specimen/DesignSystem.tsx`) and the worst-case page (`stress.html` → `src/specimen/Stress.tsx`, dev only) are built from layers 4 and 5 and hold no styling of their own beyond a few specimen-only measurements. Copy lives in `src/site/content.ts`.
+6. **Pages.** Built from layers 4 and 5; they hold no styling of their own beyond a few specimen-only measurements. Copy lives in `src/site/content.ts`, and no page states a brand line that is not in it or in Paper.
+   - **The site** (`index.html` → `src/site/`): the cobalt awning, a cream hero, the menu board beside the six objects, the voice line on ink, the season's flavour as a full band, the hours beside the mascot, the sign-off.
+   - **The design system** (`design-system.html` → `src/specimen/DesignSystem.tsx`) is laid out as a brand book: a cobalt cover, the statement beside the bird, eight chapters that each open with a display title and the brand's own line, the grounds as full-width fields named for the objects they came from, the menu board on ink. Inside the chapters the components keep Paper's measurements.
+   - **The worst-case page** (`stress.html` → `src/specimen/Stress.tsx`) is dev only.
 
 **Marks** (`src/marks/marks.generated.tsx`) are 17 React components generated from the SVGs Paper exported (`assets/marks/`) by `scripts/build-marks.mjs`. Each brand colour reads a `--cjt-mark-*` slot before its token, so a mark can be recoloured, as the cream-on-cobalt logo is, without editing paths. Each registry entry names the ground Paper shows it on.
 
@@ -69,7 +74,8 @@ Each layer reads only the ones above it.
 - **Secondary text in Astryx components is `#6D6D6D`.** Astryx's contrast check refused `#767676` on its muted surfaces. Brand components keep `#767676`, and only on white. Where Paper set muted text on chalk (the Never tag), it is ink at 60% instead, which clears 4.5:1.
 - **Colour fields are `Field`, never an Astryx `Card` variant.** One way to paint a ground means one place that knows the ground, so text on it can be checked.
 - **Astryx buttons follow Grammar 05.** "All link and button text" is cobalt, so secondary is a cobalt hairline with cobalt text and ghost is cobalt text. Primary is cream on cobalt, as on the awning. Paper drew no buttons; these are the roles applied, not a copy of a drawing.
-- **The site's composition is ours.** Paper has no page mock beyond the menu board. The site uses only system components and values: the cobalt awning, a cream-100 hero band, an ink rule over each section's stacked pair, the board beside the six objects, the mascot beside the hours.
+- **Sections open with the marker rule:** cobalt, at the 7px weight of a drawn contour. Grammar 05 gives every structural line to the Artline marker, and the weight is the marks' own.
+- **Both pages' compositions are ours.** Paper has no page mock beyond the menu board, and its sheets are quiet grids. The pages use only system components, values and the brand's own lines, and get their scale from the drawings and the colour fields, because the type stops at 68px.
 - **The cream at step 400 is `cream-400` everywhere,** the name Grammar 05 gives it. On ink the primary text colour is cream (Mock up 03), and on the cobalt awning only cream is legal, because that is all Paper sets on it.
 - **Brand components are plain HTML and CSS modules, not Astryx primitives.** Astryx's layout components only take spacing in 4px steps up to 40px, and Paper's measurements (18, 22, 26, 28, 44, 56px) and scaffold (96, 128px) aren't on that grid. Astryx's doctor flags this as style warnings, which are deliberate here. Astryx's own components (Button, TextInput, Link and the rest) are themed and used as-is.
 - **Status colours are Astryx's defaults.** Pandan, gula and ais are too pale to be visible as fills.

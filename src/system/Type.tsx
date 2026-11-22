@@ -1,6 +1,6 @@
 import type {ElementType, ReactNode} from 'react';
 import {useGround} from './Field';
-import {forbiddenText, legalText, type TextInk} from './model';
+import {forbiddenText, legalText, secondaryInk, type TextInk} from './model';
 import type {TypeRole} from './tokens';
 import t from './type.module.css';
 
@@ -8,8 +8,8 @@ export type {TypeRole};
 
 export type TypeProps = {
   role: TypeRole;
-  /** Defaults to the primary voice of the ground it sits on. */
-  ink?: TextInk;
+  /** Defaults to the ground's primary voice. `secondary` is its receding voice, whatever the ground. */
+  ink?: TextInk | 'secondary';
   as?: ElementType;
   className?: string;
   children: ReactNode;
@@ -23,7 +23,7 @@ export type TypeProps = {
 export function Type({role, ink, as: As = 'span', className, children, ...rest}: TypeProps) {
   const ground = useGround();
   const legal: readonly TextInk[] = legalText[ground];
-  const set = ink ?? legal[0];
+  const set = ink === 'secondary' ? secondaryInk(ground) : (ink ?? legal[0]);
   if (import.meta.env.DEV && !legal.includes(set)) {
     const known = forbiddenText.find((pair) => pair.ink === set && pair.ground === ground);
     console.error(`cjt: ${set} text is not legal on ${ground}. ${known?.reason ?? `Use one of: ${legal.join(', ')}.`}`);

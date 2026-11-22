@@ -21,7 +21,7 @@ import {
   TypesetWordmark,
   Verdict,
 } from '../system/components';
-import {Band, Columns, Row, Sheet, Stack} from '../system/layout';
+import {Band, Columns, Page, Row, Sheet, Stack} from '../system/layout';
 import {legalText, type Ground} from '../system/model';
 import {Field} from '../system/Field';
 
@@ -31,12 +31,15 @@ const long = {bm: `Roti ${word}`, en: sentence};
 
 export function Stress() {
   return (
-    <>
-      <Band as="header" ground="blue">
-        <Row justify="center">
-          <Logo width={1200} />
-        </Row>
-      </Band>
+    <Page
+      top={
+        <Band as="header" ground="blue">
+          <Row justify="center">
+            <Logo width={1200} />
+          </Row>
+        </Band>
+      }
+    >
       <Sheet>
         <PageHeader meta={[word, `Design system ${word}`]} aside={word} title={`${word} ${sentence}`} lede={`${word} ${sentence}`} />
 
@@ -57,7 +60,7 @@ export function Stress() {
               </Stack>
             </Tile>
             <Tile engine="lettering" ground="paper" label="No caption">
-              <Price amount={1234567.5} role="display" />
+              <Price amount={12500.5} role="head" />
             </Tile>
             <Verdict verdict="never" label={sentence} caption={word}>
               <Logo width={2000} />
@@ -91,9 +94,9 @@ export function Stress() {
         </Stack>
 
         <Columns count={5} narrow={2}>
-          <FlavourCard flavour="pandan" name={long} line={sentence} price={1234567} />
+          <FlavourCard flavour="pandan" name={long} line={sentence} />
           <FlavourCard flavour="teh" name={word} />
-          <FlavourCard flavour="ube" name="A" price={0} />
+          <FlavourCard flavour="ube" name="A" />
         </Columns>
 
         <Columns count={2}>
@@ -123,6 +126,6 @@ export function Stress() {
           ))}
         </Columns>
       </Sheet>
-    </>
+    </Page>
   );
 }

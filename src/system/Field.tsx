@@ -1,4 +1,4 @@
-import {createContext, useContext, type CSSProperties, type ReactNode} from 'react';
+import {createContext, useContext, type HTMLAttributes} from 'react';
 import {legalText, type Ground} from './model';
 import {colorVar, type ColorName} from './tokens';
 import f from './field.module.css';
@@ -10,26 +10,21 @@ export const useGround = () => useContext(GroundContext);
 
 const isGround = (colour: ColorName): colour is Ground => colour in legalText;
 
-type FieldProps = {
+type FieldProps = Omit<HTMLAttributes<HTMLElement>, 'color'> & {
   colour: ColorName;
-  as?: 'div' | 'span' | 'section' | 'article' | 'header' | 'footer';
-  className?: string;
-  style?: CSSProperties;
-  children?: ReactNode;
-  'aria-hidden'?: boolean;
-  'aria-label'?: string;
-  'aria-labelledby'?: string;
-  'data-cjt'?: string;
+  as?: 'div' | 'span' | 'section' | 'article' | 'header' | 'footer' | 'nav';
+  /** Paper is outlined unless told otherwise, or it would vanish on the page. */
+  outlined?: boolean;
 };
 
 /**
  * A flat field of one brand colour: no border, no shadow, no radius (Grammar sheet 05).
- * Paper gets a hairline, or it would vanish on the page. Everything coloured is one of
- * these, and what sits inside can ask which ground it is on.
+ * Everything that paints a colour is one of these, so what sits inside can ask which
+ * ground it is on.
  */
-export function Field({colour, as: As = 'div', className, style, children, ...rest}: FieldProps) {
+export function Field({colour, as: As = 'div', outlined = colour === 'paper', className, style, children, ...rest}: FieldProps) {
   const field = (
-    <As {...rest} className={className ? `${f.field} ${className}` : f.field} data-outlined={colour === 'paper' ? '' : undefined} style={{background: colorVar(colour), ...style}}>
+    <As {...rest} className={className ? `${f.field} ${className}` : f.field} data-outlined={outlined ? '' : undefined} style={{background: colorVar(colour), ...style}}>
       {children}
     </As>
   );

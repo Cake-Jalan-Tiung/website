@@ -1,8 +1,9 @@
 import {useState, type ReactNode} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
+import {Link} from '@astryxdesign/core/Link';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {marks, ShioPan, type MarkFamily} from '../marks/marks.generated';
+import {BurungTiung, marks, ShioPan, type MarkFamily} from '../marks/marks.generated';
 import {
   BilingualLabel,
   ColourRoles,
@@ -18,6 +19,7 @@ import {
   RuleList,
   SectionHeader,
   StackedPair,
+  Stage,
   Swatch,
   Tile,
   Tiung,
@@ -27,11 +29,12 @@ import {
   type RuleEntry,
 } from '../system/components';
 import {Field} from '../system/Field';
-import {Columns, Row, Sheet, Stack} from '../system/layout';
+import {Band, Bar, Columns, Marquee, Page, Row, Sheet, Stack} from '../system/layout';
 import {contrast, legalText, type Flavour, type Ground} from '../system/model';
 import {color, layout, minSize, tracking, typeScale, type ColorName, type TypeRole} from '../system/tokens';
 import {Type} from '../system/Type';
-import {boardPlace, labels, menu, promise, signOff, soldOutLine} from '../site/content';
+import {Closing} from '../site/Closing';
+import {boardPlace, handDrawn, labels, menu, promise, signOff, soldOutLine} from '../site/content';
 import s from './specimen.module.css';
 
 const custody: readonly RuleEntry[] = [
@@ -91,219 +94,330 @@ const flavours: Record<Flavour, string> = {
 
 const ratio = (ink: ColorName, ground: ColorName) => `${contrast(color[ink], color[ground]).toFixed(2)}:1`;
 
-function Section({id, children}: {id: string; children: ReactNode}) {
+const bakes = marks.filter((mark) => mark.engine === 'edible');
+const birdNote = marks.find((mark) => mark.name === 'BurungTiungFilled')?.note ?? '';
+
+// The chapters, in order. The index bar and each opener read this.
+const chapters = {
+  logo: {title: 'Logo', line: `Drawn above ${drawnFrom}px, typeset below. Never retyped.`, meta: `Threshold · ${drawnFrom}px wide`},
+  bird: {title: 'Burung Tiung', line: `${birdNote}. One component: the icon takes over at ${minSize['bird-icon']}px and under.`, meta: birdSizes.join(' · ')},
+  objects: {title: 'Objects', line: 'Edible things are offset fills. They sit on paper or cream-100, never cream-400.', meta: 'Six, and no more'},
+  colour: {title: 'Colour', line: 'Every colour has one job and a physical object it came from.', meta: 'Assigned by role'},
+  type: {title: 'Type', line: 'Jost is the support face. Six steps, two weights.', meta: Object.values(typeScale).map((step) => step.size).join(' · ')},
+  language: {title: 'Two languages', line: 'Malay first, English second. Never mixed inside a phrase.', meta: 'Three forms'},
+  menu: {title: 'Menu board', line: 'Ink ground, cream names and prices, warm grey English, reversed hairlines.', meta: 'Mock up 03'},
+  astryx: {title: 'Components', line: "Astryx's own components wearing the cjt theme. Colour fields are Field, not Card.", meta: '174 available'},
+} as const;
+type ChapterId = keyof typeof chapters;
+const chapterIds = Object.keys(chapters) as ChapterId[];
+const chapterNumber = (id: ChapterId) => String(chapterIds.indexOf(id) + 1).padStart(2, '0');
+
+/** A chapter's opening: its number and title set large, the brand's own line beside it, or under it in half a band. */
+function ChapterHead({id, stacked = false}: {id: ChapterId; stacked?: boolean}) {
+  const {title, line, meta} = chapters[id];
+  const heading = (
+    <Stack gap="sm">
+      <Label ink="secondary">{meta}</Label>
+      <Type role="display" as="h2" id={id}>
+        <Type role="display" ink="secondary" aria-hidden>
+          {chapterNumber(id)}
+        </Type>{' '}
+        {title}
+      </Type>
+    </Stack>
+  );
+  const statement = (
+    <Type role="subhead" as="p">
+      {line}
+    </Type>
+  );
+  return stacked ? (
+    <Stack gap="md">
+      {heading}
+      {statement}
+    </Stack>
+  ) : (
+    <Columns count={2} align="end">
+      {heading}
+      {statement}
+    </Columns>
+  );
+}
+
+function Chapter({id, children}: {id: ChapterId; children: ReactNode}) {
   return (
-    <Stack as="section" aria-labelledby={id}>
-      {children}
+    <Stack as="section" gap="xl" aria-labelledby={id}>
+      <Stack gap="md">
+        <Rule tone="marker" />
+        <ChapterHead id={id} />
+      </Stack>
+      <Stack>{children}</Stack>
     </Stack>
   );
 }
 
-function Marks({family}: {family: MarkFamily}) {
+function Marks({family, count = 3}: {family: MarkFamily; count?: 3 | 5}) {
   return (
-    <Columns count={3}>
+    <Columns count={count} narrow={count === 5 ? 2 : 1}>
       {marks
         .filter((m) => m.family === family)
         .map((m) => (
-          <MarkTile key={m.name} entry={m} />
+          <MarkTile key={m.name} entry={m} height={count === 5 ? 280 : undefined} padding={count === 5 ? 24 : undefined} />
         ))}
     </Columns>
   );
 }
 
 function GroundSample({ground}: {ground: Ground}) {
-  const inks = legalText[ground];
   return (
     <Field colour={ground} className={s.groundTile}>
-      <div className={s.groundInks}>
-        {inks.map((ink) => (
+      <Stack gap="none">
+        {legalText[ground].map((ink) => (
           <Type key={ink} role="body" ink={ink}>
-            Aa <span className={s.groundInkName}>{ink}</span>
+            Aa <Type role="caption" ink={ink}>{ink}</Type>
           </Type>
         ))}
-      </div>
+      </Stack>
       <Label>{ground}</Label>
     </Field>
   );
 }
 
+/** A ground at full width, named for the object it came from (Grammar sheet 05). */
+function Origin({role}: {role: ColourRole & {colour: Exclude<Ground, 'paper'>}}) {
+  return (
+    <Band ground={role.colour}>
+      <Columns count={2} align="end">
+        <Type role="display" as="p">
+          {role.source}
+        </Type>
+        <Stack gap="xs">
+          <Label>
+            {role.name} · {color[role.colour]}
+          </Label>
+          <Type role="body" as="p">
+            {role.description}
+          </Type>
+        </Stack>
+      </Columns>
+    </Band>
+  );
+}
+
+const isGroundRole = (role: ColourRole): role is ColourRole & {colour: Exclude<Ground, 'paper'>} => role.colour in legalText && role.colour !== 'paper';
+// Darkest first, so the fields step down to the paper the page is printed on.
+const groundRoles = roles.filter(isGroundRole).sort((a, b) => contrast(color[b.colour], color.paper) - contrast(color[a.colour], color.paper));
+const accentRoles = roles.filter((role) => !isGroundRole(role));
+
 export function DesignSystem() {
   const [email, setEmail] = useState('');
   return (
-    <Sheet>
-      <PageHeader
-        meta={['Cake Jalan Tiung', 'Design system']}
-        aside="Astryx · cjt theme"
-        title={promise}
-        lede="Every component here is measured from the Paper file — Concept, Grammar and Mock up — and built on Astryx. Where Paper disagrees with itself, Grammar wins."
-      />
-
-      <Section id="logo">
-        <SectionHeader id="logo" label="01 · Logo" caption={`Drawn above ${drawnFrom}px, typeset below. Never retyped.`} meta={`Threshold · ${drawnFrom}px wide`} />
-        <Columns count={2}>
-          <Tile engine="lettering" ground="cream-100" height={440} label={`Drawn · ${drawnFrom}px and up`} caption="Shopfront, packaging, hero.">
-            <Logo width={480} />
-          </Tile>
-          <Tile engine="lettering" ground="cream-400" height={440} label={`Typeset · under ${drawnFrom}px`} caption="Receipts, stickers, app headers. Jost Medium, caps, 0.2em.">
-            <Logo width={160} />
-          </Tile>
-        </Columns>
-        <Field colour="blue" className={s.blueBand}>
-          <Logo width={360} />
-        </Field>
-        <RuleList rules={custody} />
-      </Section>
-
-      <Section id="bird">
-        <SectionHeader id="bird" label="02 · Burung Tiung" caption={`One component. The icon takes over at ${minSize['bird-icon']}px and under.`} meta={birdSizes.join(' · ')} />
-        <div className={s.sizes}>
-          {birdSizes.map((size) => (
-            <figure key={size} className={s.sizeStep}>
-              <div className={s.sizeArt}>
-                <Tiung size={size} aria-label={`Burung Tiung at ${size}px`} />
-              </div>
-              <figcaption>
-                <Label ink="muted">{size}px</Label>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-        <Marks family="tiung" />
-        <SectionHeader id="crowned" level={3} label="Crowned Tiung" caption="The square mark. The head in profile, wearing a cake for a crown." />
-        <Marks family="crowned" />
-        <SectionHeader id="logos" level={3} label="Lockups and mascot" caption="For tiny spaces and profile pics." />
-        <Marks family="logo" />
-      </Section>
-
-      <Section id="objects">
-        <SectionHeader id="objects" label="03 · Objects" caption="Edible things are offset fills. They sit on paper or cream-100, never cream-400." meta="Six, and no more" />
-        <Marks family="pastry" />
-        <Marks family="drink" />
-        <Columns count={2}>
-          <Verdict verdict="correct" label="On cream 100" caption="The fill reads against a lighter ground.">
-            <ShioPan width="100%" height="100%" />
-          </Verdict>
-          <Verdict verdict="never" label="On cream 400" caption="The interior disappears and the drawing collapses. Stage refuses this at the type level.">
-            <Field as="span" colour="cream-400" className={s.illegal}>
-              <ShioPan width="100%" height="100%" />
-            </Field>
-          </Verdict>
-        </Columns>
-      </Section>
-
-      <Section id="colour">
-        <SectionHeader id="colour" label="04 · Colour" caption="Every colour has one job and a physical object it came from." meta="Assigned by role" />
-        <Columns count={5} narrow={2}>
-          <Swatch name="Cocoa" colour="ink" />
-          <Swatch name="Blueberry" colour="blue" />
-          <Swatch name="Buttercream" colour="cream-400" />
-          <Swatch name="Strawberry" colour="pink" />
-          <Swatch name="Sugar" colour="paper" />
-        </Columns>
-        <ColourRoles roles={roles} />
-        <SectionHeader id="grounds" level={3} label="Legal grounds" caption="What may sit on what, for body text. Generated from the pairing table, tested at 4.5:1." meta="WCAG AA" />
-        <div className={s.grounds}>
-          {(Object.keys(legalText) as Ground[]).map((g) => (
-            <GroundSample key={g} ground={g} />
-          ))}
-        </div>
-        <SectionHeader id="flavours" level={3} label="Flavours" caption="One per product family, one per surface. Ink text, cobalt wordmark." meta="Never two on one surface" />
-        <Columns count={5} narrow={2}>
-          {(Object.keys(flavours) as Flavour[]).map((flavour) => (
-            <FlavourCard key={flavour} flavour={flavour} name={flavours[flavour]} line={`Ink ${ratio('ink', flavour)} · cobalt ${ratio('blue', flavour)}`} />
-          ))}
-        </Columns>
-      </Section>
-
-      <Section id="type">
-        <SectionHeader id="type" label="05 · Type" caption="Jost is the support face. Six steps, two weights." meta={Object.values(typeScale).map((step) => step.size).join(' · ')} />
-        <ul className={s.scale}>
-          {scaleRoles.map((role) => (
-            <li key={role} className={s.scaleRow}>
-              <span className={s.scaleName}>
-                <Label>{role}</Label>
-              </span>
-              <span className={s.scaleSpec}>
-                <Type role="caption">{stepSpec(role)}</Type>
-              </span>
-              <span data-spec={`type-${role}`}>
-                <Type role={role}>{samples[role]}</Type>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <Columns count={2}>
-          <Tile engine="lettering" ground="cream-400" height={220} label="Typeset wordmark" caption="Any step of the scale. Cobalt on light grounds, cream on cobalt.">
-            <Stack as="span" gap="sm" align="center">
-              <TypesetWordmark role="label" />
-              <TypesetWordmark role="caption" />
-              <TypesetWordmark role="subhead" />
-            </Stack>
-          </Tile>
-          <Tile engine="lettering" ground="paper" height={220} label="Price" caption="A bare numeral. Screen readers hear RM.">
-            <Price amount={12} role="head" />
-          </Tile>
-        </Columns>
-      </Section>
-
-      <Section id="language">
-        <SectionHeader id="language" label="06 · Two languages" caption="Malay first, English second. Never mixed inside a phrase." meta="Three forms" />
-        <Columns count={3}>
-          <Tile engine="lettering" ground="paper" height={200} label="Middot pair" caption="For labels only.">
-            <BilingualLabel label={labels.today} />
-          </Tile>
-          <Tile engine="lettering" ground="paper" height={200} label="Stacked pair" caption="The default for menus.">
-            <StackedPair label={menu[0]} />
-          </Tile>
-          <Tile engine="lettering" ground="paper" height={200} label="Solo BM" caption="Voice lines stand alone. Never translated.">
-            <Row as="span">
-              <PinkDot />
-              <Type role="caption" lang="ms">
-                {soldOutLine}
-              </Type>
+    <Page
+      top={
+        <>
+          <Band as="header" ground="blue" fill>
+            <Logo width={960} />
+            <Row justify="between" align="baseline">
+              <Label>Design system</Label>
+              <Label>{signOff}</Label>
             </Row>
-          </Tile>
+          </Band>
+          <Bar label="Chapters">
+            {chapterIds.map((id) => (
+              <Link key={id} href={`#${id}`}>
+                <Label ink="blue">
+                  {chapterNumber(id)} {chapters[id].title}
+                </Label>
+              </Link>
+            ))}
+          </Bar>
+        </>
+      }
+      bottom={<Closing />}
+    >
+      <Band ground="cream-100">
+        <Columns count={2} align="center">
+          <PageHeader meta={['Cake Jalan Tiung', 'Design system']} aside="Astryx · cjt theme" title={promise} lede={handDrawn} />
+          <Stage engine="alive" ground="cream-100" height={560} padding={0} mark={BurungTiung} />
         </Columns>
-        <ul className={s.vocab}>
-          {Object.values(labels).map((label) => (
-            <li key={label.bm}>
-              <BilingualLabel label={label} />
-            </li>
+      </Band>
+
+      <Band ground="cream-100" bleed>
+        <Marquee>
+          {bakes.map((mark) => (
+            <mark.Component key={mark.name} width={160} />
           ))}
-        </ul>
-      </Section>
+        </Marquee>
+      </Band>
 
-      <Section id="menu">
-        <SectionHeader id="menu" label="07 · Menu board" caption="Ink ground, cream names and prices, warm grey English, reversed hairlines." meta="Mock up 03" />
-        <div className={s.boardWrap}>
-          <MenuBoard items={menu.slice(0, 3)} place={boardPlace} label={labels.today} footnote={soldOutLine} />
-        </div>
-      </Section>
+      <Sheet>
+        <Chapter id="logo">
+          <Columns count={2}>
+            <Tile engine="lettering" ground="cream-100" height={440} label={`Drawn · ${drawnFrom}px and up`} caption="Shopfront, packaging, hero.">
+              <Logo width={480} />
+            </Tile>
+            <Tile engine="lettering" ground="cream-400" height={440} label={`Typeset · under ${drawnFrom}px`} caption="Receipts, stickers, app headers. Jost Medium, caps, 0.2em.">
+              <Logo width={160} />
+            </Tile>
+          </Columns>
+          <RuleList rules={custody} />
+        </Chapter>
 
-      <Section id="astryx">
-        <SectionHeader id="astryx" label="08 · Astryx components" caption="The library's own components wearing the cjt theme. Colour fields are Field, not Card." meta="174 available" />
-        <Row>
-          <Button variant="primary" label="Tempah sekarang" />
-          <Button variant="secondary" label="Pesanan" />
-          <Button variant="ghost" label="Hari ini" />
-        </Row>
-        <div className={s.form}>
-          <TextInput type="email" width="100%" label="Email" description="One email on Friday mornings." placeholder="you@example.com" value={email} onChange={(value) => setEmail(value)} />
-        </div>
-        <div className={s.form}>
-          <Card>
-            <Type role="subhead">Card</Type>
-          </Card>
-        </div>
-      </Section>
+        <Chapter id="bird">
+          <Row gap="xl" align="end">
+            {birdSizes.map((size) => (
+              <Stack key={size} as="figure" gap="sm" align="start">
+                <Tiung size={size} aria-label={`Burung Tiung at ${size}px`} />
+                <figcaption>
+                  <Label ink="secondary">{size}px</Label>
+                </figcaption>
+              </Stack>
+            ))}
+          </Row>
+          <Marks family="tiung" count={5} />
+          <SectionHeader id="crowned" level={3} label="Crowned Tiung" caption="The square mark. The head in profile, wearing a cake for a crown." />
+          <Marks family="crowned" />
+          <SectionHeader id="logos" level={3} label="Lockups and mascot" caption="For tiny spaces and profile pics." />
+          <Marks family="logo" />
+        </Chapter>
 
-      <Stack as="footer" gap="md">
-        <Rule />
-        <Row justify="between" align="baseline">
-          <TypesetWordmark role="label" />
-          <Label ink="muted">{signOff}</Label>
-        </Row>
-      </Stack>
-    </Sheet>
+        <Chapter id="objects">
+          <Marks family="pastry" />
+          <Marks family="drink" />
+          <Columns count={2}>
+            <Verdict verdict="correct" label="On cream 100" caption="The fill reads against a lighter ground." mark={ShioPan} />
+            <Verdict verdict="never" label="On cream 400" caption="The interior disappears and the drawing collapses. Stage refuses this at the type level.">
+              <Field as="span" colour="cream-400" className={s.illegal}>
+                <ShioPan width="100%" height="100%" />
+              </Field>
+            </Verdict>
+          </Columns>
+        </Chapter>
+
+        <Chapter id="colour">
+          <Columns count={5} narrow={2}>
+            <Swatch name="Cocoa" colour="ink" />
+            <Swatch name="Blueberry" colour="blue" />
+            <Swatch name="Buttercream" colour="cream-400" />
+            <Swatch name="Strawberry" colour="pink" />
+            <Swatch name="Sugar" colour="paper" />
+          </Columns>
+        </Chapter>
+      </Sheet>
+
+      {groundRoles.map((role) => (
+        <Origin key={role.colour} role={role} />
+      ))}
+
+      <Sheet>
+        <Stack as="section" aria-labelledby="accents">
+          <SectionHeader id="accents" level={3} label="Never a ground" caption="Three colours that only ever sit on something else." />
+          <ColourRoles roles={accentRoles} />
+        </Stack>
+        <Stack as="section" aria-labelledby="grounds">
+          <SectionHeader id="grounds" level={3} label="Legal grounds" caption="What may sit on what, for body text. Generated from the pairing table, tested at 4.5:1." meta="WCAG AA" />
+          <Columns count={7} narrow={2} gap="sm">
+            {(Object.keys(legalText) as Ground[]).map((g) => (
+              <GroundSample key={g} ground={g} />
+            ))}
+          </Columns>
+        </Stack>
+        <Stack as="section" aria-labelledby="flavours">
+          <SectionHeader id="flavours" level={3} label="Flavours" caption="One per product family, one per surface. Ink text, cobalt wordmark." meta="Never two on one surface" />
+          <Columns count={5} narrow={2} gap="none">
+            {(Object.keys(flavours) as Flavour[]).map((flavour) => (
+              <FlavourCard key={flavour} flavour={flavour} name={flavours[flavour]} line={`Ink ${ratio('ink', flavour)} · cobalt ${ratio('blue', flavour)}`} />
+            ))}
+          </Columns>
+        </Stack>
+
+        <Chapter id="type">
+          <ul className={s.scale}>
+            {scaleRoles.map((role) => (
+              <li key={role} className={s.scaleRow}>
+                <span className={s.scaleName}>
+                  <Label>{role}</Label>
+                </span>
+                <span className={s.scaleSpec}>
+                  <Type role="caption">{stepSpec(role)}</Type>
+                </span>
+                <span data-spec={`type-${role}`}>
+                  <Type role={role}>{samples[role]}</Type>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Columns count={2}>
+            <Tile engine="lettering" ground="cream-400" height={220} label="Typeset wordmark" caption="Any step of the scale. Cobalt on light grounds, cream on cobalt.">
+              <Stack as="span" gap="sm" align="center">
+                <TypesetWordmark role="label" />
+                <TypesetWordmark role="caption" />
+                <TypesetWordmark role="subhead" />
+              </Stack>
+            </Tile>
+            <Tile engine="lettering" ground="paper" height={220} label="Price" caption="A bare numeral. Screen readers hear RM.">
+              <Price amount={12} role="head" />
+            </Tile>
+          </Columns>
+        </Chapter>
+
+        <Chapter id="language">
+          <Columns count={3}>
+            <Tile engine="lettering" ground="paper" height={200} label="Middot pair" caption="For labels only.">
+              <BilingualLabel label={labels.today} />
+            </Tile>
+            <Tile engine="lettering" ground="paper" height={200} label="Stacked pair" caption="The default for menus.">
+              <StackedPair label={menu[0]} />
+            </Tile>
+            <Tile engine="lettering" ground="paper" height={200} label="Solo BM" caption="Voice lines stand alone. Never translated.">
+              <Row as="span">
+                <PinkDot />
+                <Type role="caption" lang="ms">
+                  {soldOutLine}
+                </Type>
+              </Row>
+            </Tile>
+          </Columns>
+          <ul className={s.vocab}>
+            {Object.values(labels).map((label) => (
+              <li key={label.bm}>
+                <BilingualLabel label={label} />
+              </li>
+            ))}
+          </ul>
+        </Chapter>
+      </Sheet>
+
+      <Band as="section" ground="ink" aria-labelledby="menu">
+        <Columns count={2} align="center">
+          <Stack gap="xl">
+            <ChapterHead id="menu" stacked />
+            <Tiung size={240} />
+          </Stack>
+          <MenuBoard items={menu} place={boardPlace} label={labels.today} footnote={soldOutLine} />
+        </Columns>
+      </Band>
+
+      <Sheet>
+        <Chapter id="astryx">
+          <Row>
+            <Button variant="primary" label={labels.orderNow.bm} />
+            <Button variant="secondary" label={labels.order.bm} />
+            <Button variant="ghost" label={labels.today.bm} />
+          </Row>
+          <Row>
+            <Button variant="primary" label={labels.orderNow.bm} isDisabled />
+            <Button variant="secondary" label={labels.order.bm} isDisabled />
+            <Button variant="ghost" label={labels.today.bm} isDisabled />
+          </Row>
+          <Columns count={3} align="start">
+            <TextInput type="email" width="100%" label="Email" description="One email on Friday mornings." placeholder="you@example.com" value={email} onChange={(value) => setEmail(value)} />
+            <Card>
+              <Type role="subhead">Card</Type>
+            </Card>
+          </Columns>
+        </Chapter>
+      </Sheet>
+    </Page>
   );
 }

@@ -31,6 +31,8 @@ function findSpills() {
   if (document.documentElement.scrollWidth > viewport) spills.add(`the page scrolls sideways by ${document.documentElement.scrollWidth - viewport}px`);
   for (const el of document.querySelectorAll('body *')) {
     if (el.closest('svg') && el.tagName !== 'svg') continue;
+    // A marquee clips its passing content and a bar scrolls its links, both on purpose.
+    if (el.closest('[data-fit]')) continue;
     const box = el.getBoundingClientRect();
     if (box.width <= 1 || box.height <= 1) continue;
     if (box.right > viewport + 0.5 || box.left < -0.5) spills.add(`${name(el)} leaves the viewport (${Math.round(box.left)} to ${Math.round(box.right)} of ${viewport})`);

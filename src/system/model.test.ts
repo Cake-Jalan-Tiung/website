@@ -53,6 +53,13 @@ describe('Law 04 in the types', () => {
   });
 });
 
+describe('the marks registry', () => {
+  // Cobalt-lined marks need a ground cobalt reads on; the reversed drawings are for ink.
+  it.each(marks.filter((m) => !m.name.endsWith('Mono')))('$name reads on its ground', ({name, ground}) => {
+    expect(wordmarkInk(ground)).toBe(name.endsWith('Reversed') ? 'cream-400' : 'blue');
+  });
+});
+
 describe('the typeset wordmark', () => {
   it.each(Object.keys(legalText) as Ground[])('reads on %s', (ground) => {
     expect(contrast(color[wordmarkInk(ground)], color[ground])).toBeGreaterThanOrEqual(4.5);

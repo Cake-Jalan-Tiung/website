@@ -22,17 +22,84 @@
   padding-inline: var(--cjt-space-gutter);
 }
 
+.band[data-bleed] > .bandInner { max-width: none; padding-inline: 0; }
+/* A filling band takes the first screen: first child in the middle, last at the foot. */
+.band[data-fill] > .bandInner {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: center;
+  gap: var(--cjt-space-xl);
+  min-height: calc(100svh - 2 * var(--cjt-space-xl));
+}
+
+/* Bar: one line of links (a body line tall), 16 around, an ink rule under. Its height
+   is fixed so the page can keep anchors and focus clear of it. */
+:root { --cjt-bar-height: calc(2 * var(--cjt-space-sm) + var(--cjt-leading-body) + 1px); }
+html:has(.bar) { scroll-padding-top: calc(var(--cjt-bar-height) + var(--cjt-space-md)); }
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: safe center;
+  gap: var(--cjt-space-md);
+  padding: var(--cjt-space-sm);
+  border-bottom: 1px solid var(--cjt-color-ink);
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  line-height: var(--cjt-leading-body);
+}
+.bar > * { flex-shrink: 0; }
+
+.marquee { position: relative; display: flex; gap: var(--gap); overflow: hidden; }
+.marqueeRun {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--gap);
+  min-width: 100%;
+  animation: pass 48s linear infinite;
+}
+@keyframes pass {
+  to { transform: translateX(calc(-100% - var(--gap))); }
+}
+/* It stops under the pointer, on a tap, and from its button. */
+.marquee:hover > .marqueeRun,
+.marquee[data-paused] > .marqueeRun { animation-play-state: paused; }
+/* The button is for the keyboard: out of sight until it has focus. */
+.marqueePause {
+  position: absolute;
+  inset-block-start: var(--cjt-space-xs);
+  inset-inline-start: var(--cjt-space-xs);
+  z-index: 1;
+  padding: var(--cjt-space-xs);
+  border: 0;
+  background: inherit;
+  cursor: pointer;
+  opacity: 0;
+}
+.marqueePause:focus-visible { opacity: 1; outline: 2px solid currentColor; }
+/* Standing still, the line is scrolled by hand and set once. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee { overflow-x: auto; }
+  .marqueeRun { animation: none; }
+  .marqueeRun[aria-hidden] { display: none; }
+  .marqueePause { display: none; }
+}
+
 .stack { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; margin: 0; font-style: normal; }
 .row { display: flex; flex-wrap: wrap; gap: var(--gap); min-width: 0; }
 .columns { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: var(--gap); }
 
-:is(.stack, .row, .columns)[data-gap='none'] { --gap: 0; }
-:is(.stack, .row, .columns)[data-gap='xs'] { --gap: var(--cjt-space-xs); }
-:is(.stack, .row, .columns)[data-gap='sm'] { --gap: var(--cjt-space-sm); }
-:is(.stack, .row, .columns)[data-gap='md'] { --gap: var(--cjt-space-md); }
-:is(.stack, .row, .columns)[data-gap='lg'] { --gap: var(--cjt-space-lg); }
-:is(.stack, .row, .columns)[data-gap='xl'] { --gap: var(--cjt-space-xl); }
-:is(.stack, .row, .columns)[data-gap='2xl'] { --gap: var(--cjt-space-2xl); }
+:is(.stack, .row, .columns, .marquee)[data-gap='none'] { --gap: 0; }
+:is(.stack, .row, .columns, .marquee)[data-gap='xs'] { --gap: var(--cjt-space-xs); }
+:is(.stack, .row, .columns, .marquee)[data-gap='sm'] { --gap: var(--cjt-space-sm); }
+:is(.stack, .row, .columns, .marquee)[data-gap='md'] { --gap: var(--cjt-space-md); }
+:is(.stack, .row, .columns, .marquee)[data-gap='lg'] { --gap: var(--cjt-space-lg); }
+:is(.stack, .row, .columns, .marquee)[data-gap='xl'] { --gap: var(--cjt-space-xl); }
+:is(.stack, .row, .columns, .marquee)[data-gap='2xl'] { --gap: var(--cjt-space-2xl); }
 
 :is(.stack, .row, .columns)[data-align='start'] { align-items: flex-start; }
 :is(.stack, .row, .columns)[data-align='center'] { align-items: center; }
@@ -46,12 +113,14 @@
 .columns[data-count='2'] { --columns: 2; }
 .columns[data-count='3'] { --columns: 3; }
 .columns[data-count='5'] { --columns: 5; }
+.columns[data-count='7'] { --columns: 7; }
 
 /* Between the phone and the full sheet the gutters give way first, and five columns become three. */
 @media (max-width: 1199px) {
   .sheet { padding-inline: var(--cjt-space-lg); }
   .bandInner { padding-inline: var(--cjt-space-lg); }
   .columns[data-count='5'] { --columns: 3; }
+  .columns[data-count='7'] { --columns: 4; }
 }
 
 @media (max-width: 899px) {

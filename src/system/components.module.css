@@ -27,7 +27,6 @@
   padding-bottom: 18px;
   border-bottom: 1px solid var(--cjt-color-rule);
 }
-.sectionHeader[data-rule='strong'] { border-bottom-color: var(--cjt-color-ink); }
 .sectionCaption { flex: 1 1 12em; min-width: 0; }
 .sectionMeta { min-width: 0; margin-inline-start: auto; text-align: end; }
 
@@ -42,14 +41,15 @@
   /* A mark is held to the stage's drawn height; anything taller, such as wrapped text, grows the stage. */
   --h: var(--stage-h);
   --p: var(--stage-pad);
-  --art-h: calc(var(--h) - 2 * var(--p));
+  /* Public: the height a mark may fill inside this stage. */
+  --cjt-stage-art: calc(var(--h) - 2 * var(--p));
   min-height: var(--h);
   padding: var(--p);
 }
 .stageArt { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; }
-.stageArt > svg { max-width: 100%; max-height: var(--art-h); }
-/* A mark asked to fill the stage fills its drawn height, since the stage itself has no fixed one. */
-.stageArt > svg[height='100%'] { height: var(--art-h); }
+.stageArt > svg { max-width: 100%; max-height: var(--cjt-stage-art); }
+/* A stage's own mark fills its drawn height, since the stage itself has no fixed one. */
+.stageArt > .stageMark { width: 100%; height: var(--cjt-stage-art); }
 /* Verdict tag (G scaffold: Correct and Never tags at 20/20) */
 .stageTag { position: absolute; top: 20px; left: 20px; }
 
@@ -85,7 +85,6 @@
   box-sizing: border-box;
 }
 .flavourBrand { display: flex; align-items: center; gap: var(--cjt-space-xs); }
-.flavourFoot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--cjt-space-xs) var(--cjt-space-md); }
 .flavourBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
 /* PinkDot (M 4PJ-0, G06: 9x9) */
@@ -119,7 +118,8 @@
 }
 .boardName { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .boardFoot { display: flex; align-items: center; gap: 12px; padding-top: var(--cjt-space-xs); }
-.price { font-variant-numeric: tabular-nums; }
+/* A number is one thing: it never breaks across lines. */
+.price { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Mock up 03 sets the board tighter than the Grammar scale: 24/26 names, 13/17 descriptions.
    Scoped to the board so they beat the type steps whatever order the stylesheets load in. */
 .board .boardItemName { line-height: 26px; font-weight: var(--cjt-weight-medium); letter-spacing: var(--cjt-tracking-tight); }
@@ -131,7 +131,7 @@
 
 /* Rule */
 .rule { border: 0; height: 1px; margin: 0; background: var(--cjt-color-rule); }
-.rule[data-tone='strong'] { background: var(--cjt-color-ink); }
+.rule[data-tone='marker'] { height: var(--cjt-stroke-contour); background: var(--cjt-color-blue); }
 
 .visuallyHidden {
   position: absolute;

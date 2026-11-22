@@ -1,5 +1,0 @@
-/* The bar under the awning: section links over an ink rule. */
-.nav {
-  padding: var(--cjt-space-sm);
-  border-bottom: 1px solid var(--cjt-color-ink);
-}
