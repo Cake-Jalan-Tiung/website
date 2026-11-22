@@ -1,5 +1,8 @@
 import {describe, expect, expectTypeOf, it} from 'vitest';
-import {contrast, forbiddenText, hex, legalText, renderedHex, type Ground, type GroundFor, type TextInk} from './model';
+import {marks} from '../marks/marks.generated';
+import {contrast, edibleGrounds, forbiddenText, legalText, renderedHex, wordmarkInk, type Ground, type GroundFor, type TextInk} from './model';
+import {color} from './tokens';
+import themeSettings from '../../themes/cjt/cjt.settings.json?raw';
 
 const pairs = Object.entries(legalText).flatMap(([ground, inks]) =>
   inks.map((ink) => ({ground: ground as Ground, ink: ink as TextInk})),
@@ -7,16 +10,16 @@ const pairs = Object.entries(legalText).flatMap(([ground, inks]) =>
 
 describe('legal text pairings', () => {
   it.each(pairs)('$ink on $ground clears AA 4.5:1', ({ink, ground}) => {
-    expect(contrast(renderedHex(ink, ground), hex[ground])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(renderedHex(ink, ground), color[ground])).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each(forbiddenText)('$ink on $ground stays below AA: $reason', ({ink, ground}) => {
-    expect(contrast(renderedHex(ink, ground), hex[ground])).toBeLessThan(4.5);
+    expect(contrast(renderedHex(ink, ground), color[ground])).toBeLessThan(4.5);
   });
 
   it('muted fails on cream-100 and chalk, so neither lists it', () => {
-    expect(contrast(hex.muted, hex['cream-100'])).toBeLessThan(4.5);
-    expect(contrast(hex.muted, hex.chalk)).toBeLessThan(4.5);
+    expect(contrast(color.muted, color['cream-100'])).toBeLessThan(4.5);
+    expect(contrast(color.muted, color.chalk)).toBeLessThan(4.5);
   });
 });
 
@@ -31,11 +34,11 @@ describe('figures printed in Paper', () => {
     ['blue', 'blue-50', 7.2],
     ['blue', 'pandan', 4.9],
   ] as const)('%s on %s is %s:1 (sheets 05 and 06)', (ink, ground, printed) => {
-    expect(contrast(hex[ink], hex[ground])).toBeCloseTo(printed, 1);
+    expect(contrast(color[ink], color[ground])).toBeCloseTo(printed, 1);
   });
 
   it('cobalt on teh is 4.55:1, not the 4.6 printed on sheet 06', () => {
-    expect(contrast(hex.blue, hex.teh)).toBeCloseTo(4.55, 2);
+    expect(contrast(color.blue, color.teh)).toBeCloseTo(4.55, 2);
   });
 });
 
@@ -44,10 +47,26 @@ describe('Law 04 in the types', () => {
     expectTypeOf<GroundFor<'edible'>>().toEqualTypeOf<'paper' | 'cream-100'>();
     expectTypeOf<GroundFor<'alive'>>().toEqualTypeOf<Ground>();
   });
+
+  it.each(marks.filter((m) => m.engine === 'edible'))('$name is registered on a ground lighter than its fill', ({ground}) => {
+    expect(edibleGrounds).toContain(ground);
+  });
 });
 
-describe('menu board inks (Mock up 03)', () => {
-  it('warm grey descriptions on ink clear AA', () => {
-    expect(contrast('#9A9082', hex.ink)).toBeGreaterThanOrEqual(4.5);
+describe('the typeset wordmark', () => {
+  it.each(Object.keys(legalText) as Ground[])('reads on %s', (ground) => {
+    expect(contrast(color[wordmarkInk(ground)], color[ground])).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('the Astryx theme settings', () => {
+  // The editor owns cjt.settings.json and stores colours as literals, so they are held to tokens.ts here.
+  // The one exception: Astryx refused #767676 as secondary text on its muted surfaces (README, Decisions).
+  const astryxSecondary = '#6D6D6D';
+  const brand = new Set<string>([...Object.values(color), astryxSecondary]);
+  const used = [...new Set([...themeSettings.matchAll(/#[0-9a-f]{6}/gi)].map(([hex]) => hex.toUpperCase()))];
+
+  it.each(used)('%s is a brand colour', (hex) => {
+    expect(brand).toContain(hex);
   });
 });

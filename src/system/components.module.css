@@ -1,6 +1,14 @@
 /* Brand component metrics, copied from computed styles in the Paper file.
    Sources are noted per block: C = Concept page, G## = Grammar sheet, M = Mock up. */
 
+/* A list of hairline rows: 24 gap, a rule under each. */
+.list { list-style: none; margin: 0; padding: 0; }
+.row {
+  display: flex;
+  gap: var(--cjt-space-md);
+  border-bottom: 1px solid var(--cjt-color-rule);
+}
+
 /* PageHeader (C Masthead + Statement, G scaffold) */
 .pageHeader { display: flex; flex-direction: column; gap: 120px; }
 .metaRow { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--cjt-space-sm); }
@@ -9,20 +17,19 @@
 .title { max-width: 900px; white-space: pre-line; }
 .lede { max-width: var(--cjt-measure); }
 
-/* SectionHeader (C D-0, G scaffold): baseline row, 16 gap, 18 below, 1px rule */
+/* SectionHeader (C D-0, G scaffold): baseline row, 16 gap, 18 below, 1px rule.
+   The caption drops under the label before it is squeezed to nothing. */
 .sectionHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--cjt-space-sm);
+  gap: var(--cjt-space-xs) var(--cjt-space-sm);
   padding-bottom: 18px;
   border-bottom: 1px solid var(--cjt-color-rule);
 }
 .sectionHeader[data-rule='strong'] { border-bottom-color: var(--cjt-color-ink); }
-.sectionCaption { flex: 1 1 0; min-width: 0; }
-.sectionMeta { flex-shrink: 0; }
-
-/* TileCaption (C S-0 gap 5; G: ink caps label + muted caption) */
-.tileCaption { display: flex; flex-direction: column; gap: 5px; }
+.sectionCaption { flex: 1 1 12em; min-width: 0; }
+.sectionMeta { min-width: 0; margin-inline-start: auto; text-align: end; }
 
 /* Stage (C tiles 400x340; G01 tiles 612x440) */
 .stage {
@@ -32,49 +39,40 @@
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
-  height: var(--stage-h);
-  padding: var(--stage-pad);
+  /* A mark is held to the stage's drawn height; anything taller, such as wrapped text, grows the stage. */
+  --h: var(--stage-h);
+  --p: var(--stage-pad);
+  --art-h: calc(var(--h) - 2 * var(--p));
+  min-height: var(--h);
+  padding: var(--p);
 }
-.stage[data-outlined] { box-shadow: inset 0 0 0 1px var(--cjt-color-rule); }
-.stageArt { display: flex; align-items: center; justify-content: center; max-width: 100%; max-height: 100%; }
-.stageArt > svg { max-width: 100%; max-height: 100%; }
+.stageArt { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; }
+.stageArt > svg { max-width: 100%; max-height: var(--art-h); }
+/* A mark asked to fill the stage fills its drawn height, since the stage itself has no fixed one. */
+.stageArt > svg[height='100%'] { height: var(--art-h); }
+/* Verdict tag (G scaffold: Correct and Never tags at 20/20) */
+.stageTag { position: absolute; top: 20px; left: 20px; }
 
-/* Tile (C Pastry 1WP-0: stage then caption, 18 gap) */
-.tile { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+/* Tile (C Pastry 1WP-0: stage then caption, 18 gap; C S-0: label then caption, 5 gap) */
+.tile { display: flex; flex-direction: column; gap: 18px; min-width: 0; margin: 0; }
+.tileCaption { display: flex; flex-direction: column; gap: 5px; }
 
-/* Verdict (G scaffold: Correct cream-100 + blue tag, Never chalk + muted tag, tags at 20/20) */
-.verdictTag { position: absolute; top: 20px; left: 20px; }
-
-/* RuleList (G02 Custody rows: 24 gap, 16 block padding, rule; status 110, name 300) */
-.ruleList { list-style: none; margin: 0; padding: 0; }
-.ruleRow {
-  display: flex;
-  align-items: baseline;
-  gap: var(--cjt-space-md);
-  padding-block: var(--cjt-space-sm);
-  border-bottom: 1px solid var(--cjt-color-rule);
-}
+/* RuleList (G02 Custody rows: 16 block padding; status 110, name 300) */
+.ruleRow { composes: row; align-items: baseline; padding-block: var(--cjt-space-sm); }
 .ruleStatus { flex: 0 0 110px; }
 .ruleName { flex: 0 0 300px; }
 .ruleText { flex: 1 1 0; min-width: 0; }
 
-/* ColourRoles (G05 Roles: center row, 24 gap, 16 block padding; swatch 80x56, cols 170 / 190) */
-.roleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--cjt-space-md);
-  padding-block: var(--cjt-space-sm);
-  border-bottom: 1px solid var(--cjt-color-rule);
-}
+/* ColourRoles (G05 Roles: centred, 16 block padding; swatch 80x56, cols 170 / 190) */
+.roleRow { composes: row; align-items: center; padding-block: var(--cjt-space-sm); }
 .roleChip { flex: 0 0 80px; height: 56px; }
 .roleName { flex: 0 0 170px; display: flex; flex-direction: column; gap: 2px; }
 .roleSource { flex: 0 0 190px; }
 .roleText { flex: 1 1 0; min-width: 0; }
 
-/* Swatch (C 2B-0: 230 column, 16 gap, 150 chip; white chip gets the rule border) */
-.swatch { display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; }
+/* Swatch (C 2B-0: 230 column, 16 gap, 150 chip) */
+.swatch { display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; margin: 0; }
 .swatchChip { height: 150px; }
-.swatchChip[data-outlined] { box-shadow: inset 0 0 0 1px var(--cjt-color-rule); }
 .swatchMeta { display: flex; flex-direction: column; gap: 4px; }
 
 /* FlavourCard (G06: 400x260, padding 28, column space-between) */
@@ -87,10 +85,15 @@
   box-sizing: border-box;
 }
 .flavourBrand { display: flex; align-items: center; gap: var(--cjt-space-xs); }
-.flavourBody { display: flex; flex-direction: column; gap: 6px; }
+.flavourFoot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--cjt-space-xs) var(--cjt-space-md); }
+.flavourBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
 /* PinkDot (M 4PJ-0, G06: 9x9) */
-.dot { display: inline-block; flex-shrink: 0; background: var(--cjt-color-pink); border-radius: var(--radius-full); }
+.dot { display: inline-block; flex-shrink: 0; width: 9px; height: 9px; background: var(--cjt-color-pink); border-radius: var(--radius-full); }
+
+/* Marks never grow wider than their container; the lockup keeps its proportions as it shrinks. */
+.mark { max-width: 100%; }
+.logo { composes: mark; height: auto; }
 
 /* MenuBoard (M 4OD-0: ink, padding 64/56, gap 44; rows 22 block, 24 gap; head 20 below) */
 .board {
@@ -98,7 +101,6 @@
   flex-direction: column;
   gap: 44px;
   padding: var(--cjt-space-xl) 56px;
-  background: var(--cjt-color-ink);
 }
 .boardHead {
   display: flex;
@@ -108,22 +110,21 @@
   padding-bottom: 20px;
   border-bottom: 1px solid var(--cjt-color-rule-reversed);
 }
-.boardItems { list-style: none; margin: 0; padding: 0; }
 .boardItem {
-  display: flex;
+  composes: row;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--cjt-space-md);
   padding-block: 22px;
-  border-bottom: 1px solid var(--cjt-color-rule-reversed);
+  border-bottom-color: var(--cjt-color-rule-reversed);
 }
 .boardName { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .boardFoot { display: flex; align-items: center; gap: 12px; padding-top: var(--cjt-space-xs); }
-.price { font-variant-numeric: tabular-nums; flex-shrink: 0; }
-/* Mock up 03 sets the board tighter than the Grammar scale: 24/26 names, 13/17 descriptions. */
-.boardItemName { line-height: 26px; font-weight: var(--cjt-weight-medium); letter-spacing: var(--cjt-tracking-tight); }
-.boardItemPrice { line-height: 26px; }
-.boardSmall { line-height: 17px; }
+.price { font-variant-numeric: tabular-nums; }
+/* Mock up 03 sets the board tighter than the Grammar scale: 24/26 names, 13/17 descriptions.
+   Scoped to the board so they beat the type steps whatever order the stylesheets load in. */
+.board .boardItemName { line-height: 26px; font-weight: var(--cjt-weight-medium); letter-spacing: var(--cjt-tracking-tight); }
+.board .boardItemPrice { flex-shrink: 0; line-height: 26px; }
+.board .boardSmall { line-height: 17px; }
 
 /* StackedPair (G15 form 02: Malay over English) */
 .stacked { display: flex; flex-direction: column; gap: 4px; }
@@ -131,7 +132,6 @@
 /* Rule */
 .rule { border: 0; height: 1px; margin: 0; background: var(--cjt-color-rule); }
 .rule[data-tone='strong'] { background: var(--cjt-color-ink); }
-.rule[data-tone='reversed'] { background: var(--cjt-color-rule-reversed); }
 
 .visuallyHidden {
   position: absolute;
@@ -145,9 +145,9 @@
 
 @media (max-width: 899px) {
   .pageHeader { gap: var(--cjt-space-xl); }
-  .sectionHeader { flex-wrap: wrap; justify-content: space-between; row-gap: var(--cjt-space-xs); }
+  .sectionHeader { justify-content: space-between; }
   .sectionCaption { order: 3; flex-basis: 100%; }
-  .stage { height: min(var(--stage-h), 72vw); padding: min(var(--stage-pad), 6vw); }
+  .stage { --h: min(var(--stage-h), 72vw); --p: min(var(--stage-pad), 6vw); }
   .ruleRow, .roleRow { flex-wrap: wrap; row-gap: var(--cjt-space-xs); }
   .ruleName, .roleSource { flex-basis: 100%; }
   .ruleText, .roleText { flex-basis: 100%; }

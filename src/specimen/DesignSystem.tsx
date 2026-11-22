@@ -26,8 +26,12 @@ import {
   type ColourRole,
   type RuleEntry,
 } from '../system/components';
-import {groundToken, hex, inkToken, legalText, type Ground} from '../system/model';
-import {Type, type TypeRole} from '../system/Type';
+import {Field} from '../system/Field';
+import {Columns, Row, Sheet, Stack} from '../system/layout';
+import {contrast, legalText, type Flavour, type Ground} from '../system/model';
+import {color, layout, minSize, tracking, typeScale, type ColorName, type TypeRole} from '../system/tokens';
+import {Type} from '../system/Type';
+import {boardPlace, labels, menu, promise, signOff, soldOutLine} from '../site/content';
 import s from './specimen.module.css';
 
 const custody: readonly RuleEntry[] = [
@@ -48,98 +52,112 @@ const roles: readonly ColourRole[] = [
   {colour: 'cream-400', name: 'Cream 400', source: 'Kraft sleeve', description: 'Tiles, swatches, packaging fields.'},
 ];
 
-const scale: ReadonlyArray<{role: TypeRole; name: string; spec: string; sample: string}> = [
-  {role: 'display', name: 'Display', spec: '68 / 70 · Medium · −0.03em', sample: 'Baking the world'},
-  {role: 'head', name: 'Head', spec: '40 / 42 · Medium · −0.03em', sample: 'Section openers'},
-  {role: 'subhead', name: 'Subhead', spec: '24 / 28 · Regular', sample: 'Product names and prices'},
-  {role: 'body', name: 'Body', spec: '15 / 24 · Regular · 520 max', sample: 'Sentences that a person actually reads.'},
-  {role: 'caption', name: 'Caption', spec: '13 / 16 · Regular', sample: 'Descriptions under a label.'},
-  {role: 'label', name: 'Label', spec: '11 / 14 · Regular · 0.18em caps', sample: 'Only ever uppercase'},
-];
+const samples: Record<TypeRole, string> = {
+  display: 'Baking the world',
+  head: 'Section openers',
+  subhead: 'Product names and prices',
+  body: 'Sentences that a person actually reads.',
+  caption: 'Descriptions under a label.',
+  label: 'Only ever uppercase',
+};
 
-const vocabulary = [
-  {bm: 'Hari ini', en: 'Today'},
-  {bm: 'Baru keluar oven', en: 'Fresh from the oven'},
-  {bm: 'Musim ini', en: 'In season'},
-  {bm: 'Tempah sekarang', en: 'Order now'},
-  {bm: 'Pesanan', en: 'Order'},
-] as const;
+const capitalise = (word: string) => word[0].toUpperCase() + word.slice(1);
 
-const menu = [
-  {bm: 'Roti Garam', en: 'Shio pan · salt roll, buttery centre', price: 8},
-  {bm: 'Kek Pandan Kaya', en: 'Pandan kaya cake, coconut jam', price: 12},
-  {bm: 'Teh Tarik', en: 'Pulled tea, condensed milk', price: 7},
-] as const;
+/** A step's numbers as the Grammar sheet prints them, e.g. "68 / 70 · Medium · −0.03em". */
+function stepSpec(role: TypeRole): string {
+  const step = typeScale[role];
+  return [
+    `${step.size} / ${step.leading}`,
+    capitalise(step.weight),
+    step.tracking ? `${String(tracking[step.tracking]).replace('-', '−')}em${step.caps ? ' caps' : ''}` : null,
+    role === 'body' ? `${layout.measure} max` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+const scaleRoles = (Object.keys(typeScale) as TypeRole[]).reverse();
+const birdSizes = [320, 96, minSize['bird-icon'], 16];
+const drawnFrom = minSize['wordmark-drawn'];
+
+// Sheet 06 names one product family per flavour.
+const flavours: Record<Flavour, string> = {
+  pandan: 'Pandan Kaya',
+  gula: 'Gula Melaka',
+  ais: 'Ais Cendol',
+  ube: 'Ube Roll',
+  teh: 'Teh Tarik',
+};
+
+const ratio = (ink: ColorName, ground: ColorName) => `${contrast(color[ink], color[ground]).toFixed(2)}:1`;
 
 function Section({id, children}: {id: string; children: ReactNode}) {
   return (
-    <section className={s.section} aria-labelledby={id}>
+    <Stack as="section" aria-labelledby={id}>
       {children}
-    </section>
+    </Stack>
   );
 }
 
 function Marks({family}: {family: MarkFamily}) {
   return (
-    <div className={s.triple}>
+    <Columns count={3}>
       {marks
         .filter((m) => m.family === family)
         .map((m) => (
           <MarkTile key={m.name} entry={m} />
         ))}
-    </div>
+    </Columns>
   );
 }
 
 function GroundSample({ground}: {ground: Ground}) {
   const inks = legalText[ground];
   return (
-    <figure className={s.groundTile} style={{background: groundToken[ground], margin: 0}} data-outlined={ground === 'paper' ? '' : undefined}>
+    <Field colour={ground} className={s.groundTile}>
       <div className={s.groundInks}>
         {inks.map((ink) => (
-          <span key={ink} className={s.groundInk} style={{color: inkToken[ink]}}>
+          <Type key={ink} role="body" ink={ink}>
             Aa <span className={s.groundInkName}>{ink}</span>
-          </span>
+          </Type>
         ))}
       </div>
-      <figcaption>
-        <Label ink={ground === 'ink' ? 'cream' : 'ink'}>{ground}</Label>
-      </figcaption>
-    </figure>
+      <Label>{ground}</Label>
+    </Field>
   );
 }
 
 export function DesignSystem() {
   const [email, setEmail] = useState('');
   return (
-    <main className={s.sheet}>
+    <Sheet>
       <PageHeader
         meta={['Cake Jalan Tiung', 'Design system']}
         aside="Astryx · cjt theme"
-        title={'Baking the world\na little sweeter.'}
+        title={promise}
         lede="Every component here is measured from the Paper file — Concept, Grammar and Mock up — and built on Astryx. Where Paper disagrees with itself, Grammar wins."
       />
 
       <Section id="logo">
-        <SectionHeader id="logo" label="01 · Logo" caption="Drawn above 180px, typeset below. Never retyped." meta="Threshold · 180px wide" />
-        <div className={s.pair}>
-          <Tile engine="lettering" ground="cream-100" height={440} label="Drawn · 180px and up" caption="Shopfront, packaging, hero.">
+        <SectionHeader id="logo" label="01 · Logo" caption={`Drawn above ${drawnFrom}px, typeset below. Never retyped.`} meta={`Threshold · ${drawnFrom}px wide`} />
+        <Columns count={2}>
+          <Tile engine="lettering" ground="cream-100" height={440} label={`Drawn · ${drawnFrom}px and up`} caption="Shopfront, packaging, hero.">
             <Logo width={480} />
           </Tile>
-          <Tile engine="lettering" ground="cream-400" height={440} label="Typeset · under 180px" caption="Receipts, stickers, app headers. Jost Medium, caps, 0.2em.">
+          <Tile engine="lettering" ground="cream-400" height={440} label={`Typeset · under ${drawnFrom}px`} caption="Receipts, stickers, app headers. Jost Medium, caps, 0.2em.">
             <Logo width={160} />
           </Tile>
-        </div>
-        <div className={s.blueBand}>
-          <Logo width={360} onBlue />
-        </div>
+        </Columns>
+        <Field colour="blue" className={s.blueBand}>
+          <Logo width={360} />
+        </Field>
         <RuleList rules={custody} />
       </Section>
 
       <Section id="bird">
-        <SectionHeader id="bird" label="02 · Burung Tiung" caption="One component. The icon takes over at 32px and under." meta="320 · 96 · 32 · 16" />
+        <SectionHeader id="bird" label="02 · Burung Tiung" caption={`One component. The icon takes over at ${minSize['bird-icon']}px and under.`} meta={birdSizes.join(' · ')} />
         <div className={s.sizes}>
-          {[320, 96, 32, 16].map((size) => (
+          {birdSizes.map((size) => (
             <figure key={size} className={s.sizeStep}>
               <div className={s.sizeArt}>
                 <Tiung size={size} aria-label={`Burung Tiung at ${size}px`} />
@@ -161,27 +179,27 @@ export function DesignSystem() {
         <SectionHeader id="objects" label="03 · Objects" caption="Edible things are offset fills. They sit on paper or cream-100, never cream-400." meta="Six, and no more" />
         <Marks family="pastry" />
         <Marks family="drink" />
-        <div className={s.pair}>
+        <Columns count={2}>
           <Verdict verdict="correct" label="On cream 100" caption="The fill reads against a lighter ground.">
             <ShioPan width="100%" height="100%" />
           </Verdict>
           <Verdict verdict="never" label="On cream 400" caption="The interior disappears and the drawing collapses. Stage refuses this at the type level.">
-            <span className={s.illegal} style={{background: hex['cream-400']}}>
+            <Field as="span" colour="cream-400" className={s.illegal}>
               <ShioPan width="100%" height="100%" />
-            </span>
+            </Field>
           </Verdict>
-        </div>
+        </Columns>
       </Section>
 
       <Section id="colour">
         <SectionHeader id="colour" label="04 · Colour" caption="Every colour has one job and a physical object it came from." meta="Assigned by role" />
-        <div className={s.five}>
+        <Columns count={5} narrow={2}>
           <Swatch name="Cocoa" colour="ink" />
           <Swatch name="Blueberry" colour="blue" />
-          <Swatch name="Buttercream" colour="cream" />
+          <Swatch name="Buttercream" colour="cream-400" />
           <Swatch name="Strawberry" colour="pink" />
           <Swatch name="Sugar" colour="paper" />
-        </div>
+        </Columns>
         <ColourRoles roles={roles} />
         <SectionHeader id="grounds" level={3} label="Legal grounds" caption="What may sit on what, for body text. Generated from the pairing table, tested at 4.5:1." meta="WCAG AA" />
         <div className={s.grounds}>
@@ -190,68 +208,66 @@ export function DesignSystem() {
           ))}
         </div>
         <SectionHeader id="flavours" level={3} label="Flavours" caption="One per product family, one per surface. Ink text, cobalt wordmark." meta="Never two on one surface" />
-        <div className={s.five}>
-          <FlavourCard flavour="pandan" name="Pandan Kaya" line="Ink 11.4:1 · cobalt 4.9:1" />
-          <FlavourCard flavour="gula" name="Gula Melaka" line="Ink 11.8:1 · cobalt 5.0:1" />
-          <FlavourCard flavour="ais" name="Ais Cendol" line="Ink 11.4:1 · cobalt 4.9:1" />
-          <FlavourCard flavour="ube" name="Ube Roll" line="Ink 11.0:1 · cobalt 4.7:1" />
-          <FlavourCard flavour="teh" name="Teh Tarik" line="Ink 10.6:1 · cobalt 4.55:1" />
-        </div>
+        <Columns count={5} narrow={2}>
+          {(Object.keys(flavours) as Flavour[]).map((flavour) => (
+            <FlavourCard key={flavour} flavour={flavour} name={flavours[flavour]} line={`Ink ${ratio('ink', flavour)} · cobalt ${ratio('blue', flavour)}`} />
+          ))}
+        </Columns>
       </Section>
 
       <Section id="type">
-        <SectionHeader id="type" label="05 · Type" caption="Jost is the support face. Six steps, two weights." meta="11 · 13 · 15 · 24 · 40 · 68" />
+        <SectionHeader id="type" label="05 · Type" caption="Jost is the support face. Six steps, two weights." meta={Object.values(typeScale).map((step) => step.size).join(' · ')} />
         <ul className={s.scale}>
-          {scale.map((step) => (
-            <li key={step.role} className={s.scaleRow}>
+          {scaleRoles.map((role) => (
+            <li key={role} className={s.scaleRow}>
               <span className={s.scaleName}>
-                <Label>{step.name}</Label>
+                <Label>{role}</Label>
               </span>
               <span className={s.scaleSpec}>
-                <Type role="caption">{step.spec}</Type>
+                <Type role="caption">{stepSpec(role)}</Type>
               </span>
-              <span data-spec={`type-${step.role}`}>
-                <Type role={step.role}>{step.sample}</Type>
+              <span data-spec={`type-${role}`}>
+                <Type role={role}>{samples[role]}</Type>
               </span>
             </li>
           ))}
         </ul>
-        <div className={s.pair}>
+        <Columns count={2}>
           <Tile engine="lettering" ground="cream-400" height={220} label="Typeset wordmark" caption="Any step of the scale. Cobalt on light grounds, cream on cobalt.">
-            <span className={s.stack}>
+            <Stack as="span" gap="sm" align="center">
               <TypesetWordmark role="label" />
               <TypesetWordmark role="caption" />
               <TypesetWordmark role="subhead" />
-            </span>
+            </Stack>
           </Tile>
           <Tile engine="lettering" ground="paper" height={220} label="Price" caption="A bare numeral. Screen readers hear RM.">
             <Price amount={12} role="head" />
           </Tile>
-        </div>
+        </Columns>
       </Section>
 
       <Section id="language">
         <SectionHeader id="language" label="06 · Two languages" caption="Malay first, English second. Never mixed inside a phrase." meta="Three forms" />
-        <div className={s.triple}>
+        <Columns count={3}>
           <Tile engine="lettering" ground="paper" height={200} label="Middot pair" caption="For labels only.">
-            <BilingualLabel label={{bm: 'Hari ini', en: 'Today'}} />
+            <BilingualLabel label={labels.today} />
           </Tile>
           <Tile engine="lettering" ground="paper" height={200} label="Stacked pair" caption="The default for menus.">
-            <StackedPair label={{bm: 'Roti Garam', en: 'Salt roll, buttery centre'}} />
+            <StackedPair label={menu[0]} />
           </Tile>
           <Tile engine="lettering" ground="paper" height={200} label="Solo BM" caption="Voice lines stand alone. Never translated.">
-            <span className={s.inline}>
+            <Row as="span">
               <PinkDot />
               <Type role="caption" lang="ms">
-                Habis bila habis
+                {soldOutLine}
               </Type>
-            </span>
+            </Row>
           </Tile>
-        </div>
+        </Columns>
         <ul className={s.vocab}>
-          {vocabulary.map((v) => (
-            <li key={v.bm}>
-              <BilingualLabel label={v} />
+          {Object.values(labels).map((label) => (
+            <li key={label.bm}>
+              <BilingualLabel label={label} />
             </li>
           ))}
         </ul>
@@ -260,42 +276,34 @@ export function DesignSystem() {
       <Section id="menu">
         <SectionHeader id="menu" label="07 · Menu board" caption="Ink ground, cream names and prices, warm grey English, reversed hairlines." meta="Mock up 03" />
         <div className={s.boardWrap}>
-          <MenuBoard items={menu} place="Jalan Tiung" label={{bm: 'Hari ini', en: 'Today'}} footnote="Habis bila habis" />
+          <MenuBoard items={menu.slice(0, 3)} place={boardPlace} label={labels.today} footnote={soldOutLine} />
         </div>
       </Section>
 
       <Section id="astryx">
-        <SectionHeader id="astryx" label="08 · Astryx components" caption="The library's own components wearing the cjt theme." meta="174 available" />
-        <div className={s.inline}>
+        <SectionHeader id="astryx" label="08 · Astryx components" caption="The library's own components wearing the cjt theme. Colour fields are Field, not Card." meta="174 available" />
+        <Row>
           <Button variant="primary" label="Tempah sekarang" />
           <Button variant="secondary" label="Pesanan" />
           <Button variant="ghost" label="Hari ini" />
-        </div>
+        </Row>
         <div className={s.form}>
           <TextInput type="email" width="100%" label="Email" description="One email on Friday mornings." placeholder="you@example.com" value={email} onChange={(value) => setEmail(value)} />
         </div>
-        <div className={s.triple}>
+        <div className={s.form}>
           <Card>
-            <Type role="subhead">Default card</Type>
-          </Card>
-          <Card variant="cream">
-            <Type role="subhead">Cream card</Type>
-          </Card>
-          <Card variant="ink">
-            <Type role="subhead" ink="paper">
-              Ink card
-            </Type>
+            <Type role="subhead">Card</Type>
           </Card>
         </div>
       </Section>
 
-      <footer className={s.footer}>
+      <Stack as="footer" gap="md">
         <Rule />
-        <div className={s.footRow}>
+        <Row justify="between" align="baseline">
           <TypesetWordmark role="label" />
-          <Label ink="muted">With love, from our kitchen</Label>
-        </div>
-      </footer>
-    </main>
+          <Label ink="muted">{signOff}</Label>
+        </Row>
+      </Stack>
+    </Sheet>
   );
 }

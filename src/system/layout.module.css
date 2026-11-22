@@ -1,0 +1,63 @@
+/* Layout on the brand's own spacing steps. Astryx's stacks stop at 40px; the Grammar
+   scaffold runs 96 gutters, 1248 content and 128 between sections. */
+
+/* Sheet (G scaffold) */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cjt-space-section);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding: var(--cjt-space-2xl) var(--cjt-space-gutter) var(--cjt-space-section);
+}
+
+/* Band: full bleed, 64 above and below, content on the sheet's gutters. */
+.band { padding-block: var(--cjt-space-xl); }
+.bandInner {
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding-inline: var(--cjt-space-gutter);
+}
+
+.stack { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; margin: 0; font-style: normal; }
+.row { display: flex; flex-wrap: wrap; gap: var(--gap); min-width: 0; }
+.columns { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: var(--gap); }
+
+:is(.stack, .row, .columns)[data-gap='none'] { --gap: 0; }
+:is(.stack, .row, .columns)[data-gap='xs'] { --gap: var(--cjt-space-xs); }
+:is(.stack, .row, .columns)[data-gap='sm'] { --gap: var(--cjt-space-sm); }
+:is(.stack, .row, .columns)[data-gap='md'] { --gap: var(--cjt-space-md); }
+:is(.stack, .row, .columns)[data-gap='lg'] { --gap: var(--cjt-space-lg); }
+:is(.stack, .row, .columns)[data-gap='xl'] { --gap: var(--cjt-space-xl); }
+:is(.stack, .row, .columns)[data-gap='2xl'] { --gap: var(--cjt-space-2xl); }
+
+:is(.stack, .row, .columns)[data-align='start'] { align-items: flex-start; }
+:is(.stack, .row, .columns)[data-align='center'] { align-items: center; }
+:is(.stack, .row, .columns)[data-align='end'] { align-items: flex-end; }
+:is(.stack, .row, .columns)[data-align='baseline'] { align-items: baseline; }
+:is(.stack, .row, .columns)[data-align='stretch'] { align-items: stretch; }
+:is(.stack, .row, .columns)[data-justify='between'] { justify-content: space-between; }
+:is(.stack, .row, .columns)[data-justify='center'] { justify-content: center; }
+:is(.stack, .row, .columns)[data-justify='end'] { justify-content: flex-end; }
+
+.columns[data-count='2'] { --columns: 2; }
+.columns[data-count='3'] { --columns: 3; }
+.columns[data-count='5'] { --columns: 5; }
+
+/* Between the phone and the full sheet the gutters give way first, and five columns become three. */
+@media (max-width: 1199px) {
+  .sheet { padding-inline: var(--cjt-space-lg); }
+  .bandInner { padding-inline: var(--cjt-space-lg); }
+  .columns[data-count='5'] { --columns: 3; }
+}
+
+@media (max-width: 899px) {
+  .sheet { gap: var(--cjt-space-2xl); padding: var(--cjt-space-xl) var(--cjt-space-sm); }
+  .band { padding-block: var(--cjt-space-lg); }
+  .bandInner { padding-inline: var(--cjt-space-sm); }
+  .columns[data-count] { --columns: 1; }
+  .columns[data-count][data-narrow='2'] { --columns: 2; }
+}

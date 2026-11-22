@@ -1,181 +1,117 @@
-import {Card} from '@astryxdesign/core/Card';
-import {Divider} from '@astryxdesign/core/Divider';
-import {Grid} from '@astryxdesign/core/Grid';
-import {Heading} from '@astryxdesign/core/Heading';
-import {HStack} from '@astryxdesign/core/HStack';
+import type {ReactNode} from 'react';
 import {Link} from '@astryxdesign/core/Link';
-import {Text} from '@astryxdesign/core/Text';
-import {VStack} from '@astryxdesign/core/VStack';
+import {BurungTiung, marks, TiungCat} from '../marks/marks.generated';
+import {FlavourCard, Label, Logo, MarkTile, MenuBoard, Rule, SectionHeader, StackedPair, Stage, Statement, VisuallyHidden} from '../system/components';
+import {Band, Columns, Row, Sheet, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {BilingualLabel, Label, Logo, MenuBoard, PinkDot, Price, TypesetWordmark} from '../system/components';
-import {BurungTiung, marks} from '../marks/marks.generated';
-import {address, boardPlace, hours, inSeason, labels, menu, promise, signOff, soldOutLine, type Bilingual} from './content';
+import {address, boardPlace, handDrawn, hours, inSeason, labels, menu, promise, signOff, soldOutLine, type Bilingual} from './content';
+import s from './site.module.css';
 
-const CONTENT_WIDTH = 1248;
+const sections = {today: 'hari-ini', inSeason: 'musim-ini', open: 'buka'} as const;
+const bakes = marks.filter((mark) => mark.family === 'pastry' || mark.family === 'drink');
 
-// Grammar sheet 15, form 02: the stacked pair. Malay is the heading, English sits under it.
-function SectionTitle({label, id}: {label: Bilingual; id: string}) {
+/** A site section: an ink rule, then the stacked pair as its heading. */
+function Section({id, label, children}: {id: string; label: Bilingual; children: ReactNode}) {
   return (
-    <VStack gap={1}>
-      <Type role="head" as="h2" id={id} lang="ms">
-        {label.bm}
-      </Type>
-      <Type role="caption" ink="muted">
-        {label.en}
-      </Type>
-    </VStack>
-  );
-}
-
-function Awning() {
-  return (
-    <VStack as="header" hAlign="center" paddingBlock={6} paddingInline={4} style={{background: 'var(--cjt-color-blue)'}}>
-      <Logo width={260} onBlue />
-    </VStack>
+    <Stack as="section" aria-labelledby={id}>
+      <Stack gap="md">
+        <Rule tone="strong" />
+        <StackedPair label={label} role="head" as="h2" id={id} />
+      </Stack>
+      {children}
+    </Stack>
   );
 }
 
 function Nav() {
-  const links: Array<{href: string; label: Bilingual}> = [
-    {href: '#hari-ini', label: labels.today},
-    {href: '#musim-ini', label: labels.inSeason},
-    {href: '#buka', label: labels.open},
-  ];
   return (
-    <HStack as="nav" aria-label="Sections" justify="center" gap={6} wrap="wrap" paddingBlock={3} paddingInline={4}>
-      {links.map(({href, label}) => (
-        <Link key={href} href={href}>
-          <Label ink="blue">
-            {label.bm} · {label.en}
-          </Label>
-        </Link>
-      ))}
-    </HStack>
-  );
-}
-
-function Hero() {
-  return (
-    <Grid columns={{minWidth: 320, max: 2}} gap={8} align="center">
-      <VStack gap={4}>
-        <Heading level={1} type="display-1" textWrap="balance">
-          {promise}
-        </Heading>
-        <Text color="secondary" display="block" style={{maxWidth: 520}}>
-          Every little mark here was drawn by hand — with a lot of love, and a little flour.
-        </Text>
-      </VStack>
-      <Card variant="cream-light" padding={8}>
-        <VStack height={420} hAlign="center" vAlign="center">
-          <BurungTiung width="100%" height="100%" />
-        </VStack>
-      </Card>
-    </Grid>
-  );
-}
-
-function Today() {
-  const bakes = marks.filter((m) => m.family === 'pastry' || m.family === 'drink');
-  return (
-    <VStack as="section" gap={6} aria-labelledby="hari-ini">
-      <SectionTitle id="hari-ini" label={labels.today} />
-      <Grid columns={{minWidth: 340, max: 2}} gap={8} align="start">
-        <MenuBoard items={menu} place={boardPlace} label={labels.today} footnote={soldOutLine} />
-        <VStack gap={3}>
-          <BilingualLabel label={labels.freshFromOven} />
-          <Grid columns={{minWidth: 150, max: 3}} gap={2}>
-            {bakes.map(({name, label, Component}) => (
-              <VStack key={name} gap={1}>
-                <Card variant="cream-light" padding={3}>
-                  <VStack height={150} hAlign="center" vAlign="center">
-                    <Component width="100%" height="100%" />
-                  </VStack>
-                </Card>
-                <Label ink="muted">{label}</Label>
-              </VStack>
-            ))}
-          </Grid>
-        </VStack>
-      </Grid>
-    </VStack>
-  );
-}
-
-function InSeason() {
-  const {item, flavour, word} = inSeason;
-  return (
-    <VStack as="section" gap={6} aria-labelledby="musim-ini">
-      <SectionTitle id="musim-ini" label={labels.inSeason} />
-      <Card variant={flavour} padding={10}>
-        <VStack gap={8}>
-          <HStack gap={1.5} align="center">
-            <TypesetWordmark />
-            <PinkDot />
-          </HStack>
-          <VStack gap={2}>
-            <Label>{word}</Label>
-            <Heading level={3} type="display-2" color="inherit">
-              <span lang="ms">{item.bm}</span>
-            </Heading>
-            <Text color="inherit">
-              {item.en}
-            </Text>
-          </VStack>
-          <Price amount={item.price} />
-        </VStack>
-      </Card>
-    </VStack>
-  );
-}
-
-function Visit() {
-  return (
-    <VStack as="section" gap={6} aria-labelledby="buka">
-      <SectionTitle id="buka" label={labels.open} />
-      <Grid columns={{minWidth: 280, max: 2}} gap={8} align="end">
-        <VStack gap={1}>
-          <Heading level={3} type="display-1" color="accent" aria-label={hours.spoken}>
-            {hours.opens} – {hours.closes}
-          </Heading>
-          <Text color="secondary">{hours.written}</Text>
-        </VStack>
-        <VStack as="address" gap={0.5} style={{fontStyle: 'normal'}}>
-          <Label ink="muted">Cake Jalan Tiung</Label>
-          {address.lines.map((line) => (
-            <Text key={line} display="block">
-              {line}
-            </Text>
-          ))}
-        </VStack>
-      </Grid>
-    </VStack>
-  );
-}
-
-function Footer() {
-  return (
-    <VStack as="footer" gap={3}>
-      <Divider />
-      <HStack justify="between" align="end" wrap="wrap" gap={3}>
-        <Logo width={120} />
-        <Label ink="muted">{signOff}</Label>
-      </HStack>
-    </VStack>
+    <nav aria-label="Sections" className={s.nav}>
+      <Row justify="center" gap="md">
+        {(Object.keys(sections) as Array<keyof typeof sections>).map((key) => (
+          <Link key={key} href={`#${sections[key]}`}>
+            <Label ink="blue">
+              <span lang="ms">{labels[key].bm}</span> · {labels[key].en}
+            </Label>
+          </Link>
+        ))}
+      </Row>
+    </nav>
   );
 }
 
 export function Site() {
   return (
-    <VStack gap={0}>
-      <Awning />
+    <>
+      <Band as="header" ground="blue">
+        <Row justify="center">
+          <Logo width={360} />
+        </Row>
+      </Band>
       <Nav />
-      <VStack as="main" gap={10} paddingBlock={10} paddingInline={4} maxWidth={CONTENT_WIDTH} width="100%" style={{marginInline: 'auto'}}>
-        <Hero />
-        <Today />
-        <InSeason />
-        <Visit />
-        <Footer />
-      </VStack>
-    </VStack>
+      <Band ground="cream-100">
+        <Columns count={2} align="center">
+          <Statement title={promise} lede={handDrawn} />
+          <Stage engine="alive" ground="cream-100" height={560} padding={0}>
+            <BurungTiung width="100%" height="100%" />
+          </Stage>
+        </Columns>
+      </Band>
+      <Sheet>
+        <Section id={sections.today} label={labels.today}>
+          <Columns count={2} align="start">
+            <MenuBoard items={menu} place={boardPlace} label={labels.today} footnote={soldOutLine} />
+            <Stack gap="md">
+              <SectionHeader level={3} lang="ms" label={labels.freshFromOven.bm} caption={labels.freshFromOven.en} />
+              <Columns count={2} narrow={2}>
+                {bakes.map((mark) => (
+                  <MarkTile key={mark.name} entry={mark} height={200} padding={24} />
+                ))}
+              </Columns>
+            </Stack>
+          </Columns>
+        </Section>
+
+        <Section id={sections.inSeason} label={labels.inSeason}>
+          <FlavourCard flavour={inSeason.flavour} name={inSeason.item} price={inSeason.item.price} />
+        </Section>
+
+        <Section id={sections.open} label={labels.open}>
+          <Columns count={2} align="end">
+            <Stack>
+              <Stack gap="xs">
+                <Type role="display" as="p" aria-hidden>
+                  {hours.opens} – {hours.closes}
+                </Type>
+                <Type role="body" as="p" ink="muted">
+                  <span aria-hidden>{hours.written}</span>
+                  <VisuallyHidden>{hours.spoken}</VisuallyHidden>
+                </Type>
+              </Stack>
+              <Stack as="address" gap="xs">
+                <Label ink="muted">{address.name}</Label>
+                <Stack gap="none">
+                  {address.lines.map((line) => (
+                    <Type key={line} role="body">
+                      {line}
+                    </Type>
+                  ))}
+                </Stack>
+              </Stack>
+            </Stack>
+            <Stage engine="alive" ground="cream-100">
+              <TiungCat width="100%" height="100%" />
+            </Stage>
+          </Columns>
+        </Section>
+
+        <Stack as="footer" gap="md">
+          <Rule tone="strong" />
+          <Row justify="between" align="baseline">
+            <Logo width={120} />
+            <Label ink="muted">{signOff}</Label>
+          </Row>
+        </Stack>
+      </Sheet>
+    </>
   );
 }

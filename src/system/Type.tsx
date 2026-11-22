@@ -1,42 +1,35 @@
 import type {ElementType, ReactNode} from 'react';
-import type {TextInk} from './model';
+import {useGround} from './Field';
+import {forbiddenText, legalText, type TextInk} from './model';
+import type {TypeRole} from './tokens';
 import t from './type.module.css';
 
-export type TypeRole = 'label' | 'caption' | 'body' | 'subhead' | 'head' | 'display';
+export type {TypeRole};
 
-const inkClass: Record<TextInk | 'ink-muted', string> = {
-  ink: t.ink,
-  muted: t.muted,
-  blue: t.blue,
-  paper: t.paper,
-  cream: t.cream,
-  pink: t.pink,
-  'ink-60': t['ink-60'],
-  'ink-muted': t.inkMuted,
-};
-
-/** Brand type: one of the six Grammar sheet 04 steps, in one of the legal inks. */
-export function Type({
-  role,
-  ink = 'ink',
-  as: As = 'span',
-  className,
-  children,
-  id,
-  lang,
-  'data-cjt': dataCjt,
-}: {
+export type TypeProps = {
   role: TypeRole;
-  ink?: TextInk | 'ink-muted';
+  /** Defaults to the primary voice of the ground it sits on. */
+  ink?: TextInk;
   as?: ElementType;
   className?: string;
   children: ReactNode;
   id?: string;
   lang?: string;
+  'aria-hidden'?: boolean;
   'data-cjt'?: string;
-}) {
+};
+
+/** Brand type: one of the six Grammar sheet 04 steps, in an ink that is legal on its ground. */
+export function Type({role, ink, as: As = 'span', className, children, ...rest}: TypeProps) {
+  const ground = useGround();
+  const legal: readonly TextInk[] = legalText[ground];
+  const set = ink ?? legal[0];
+  if (import.meta.env.DEV && !legal.includes(set)) {
+    const known = forbiddenText.find((pair) => pair.ink === set && pair.ground === ground);
+    console.error(`cjt: ${set} text is not legal on ${ground}. ${known?.reason ?? `Use one of: ${legal.join(', ')}.`}`);
+  }
   return (
-    <As id={id} lang={lang} data-cjt={dataCjt} className={[t[role], inkClass[ink], t.reset, className].filter(Boolean).join(' ')}>
+    <As {...rest} className={[t[role], t[set], className].filter(Boolean).join(' ')}>
       {children}
     </As>
   );

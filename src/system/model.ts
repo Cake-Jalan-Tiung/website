@@ -1,86 +1,38 @@
 // The rules of the Cake Jalan Tiung brand as data. Sources: Paper file "Cake Jalan
-// Tiung", page Grammar (sheet numbers below) and page Concept.
+// Tiung", page Grammar (sheet numbers below) and page Concept. Values live in tokens.ts.
+import {color, inkSoftAlpha, type ColorName} from './tokens';
+
+export type Flavour = Extract<ColorName, 'pandan' | 'gula' | 'ais' | 'ube' | 'teh'>;
 
 /** A surface something can sit on. Sheet 05 (paper, creams, ink), sheet 06 (wash, flavours). */
-export type Flavour = 'pandan' | 'gula' | 'ais' | 'ube' | 'teh';
-export type Ground =
-  | 'paper'
-  | 'cream-100'
-  | 'cream-400'
-  | 'chalk'
-  | 'ink'
-  | 'blue-50'
-  | 'blue-100'
-  | 'blue-200'
-  | Flavour;
-
-/** A colour text can be set in. `ink-60` is ink at 60% opacity (sheet 05, on cream-400). */
-export type TextInk = 'ink' | 'blue' | 'muted' | 'paper' | 'cream' | 'pink' | 'ink-60';
-
-export const hex = {
-  paper: '#FFFFFF',
-  ink: '#111111',
-  muted: '#767676',
-  rule: '#E4E4E4',
-  blue: '#031CFE',
-  pink: '#F75D9A',
-  cream: '#FAE0AF',
-  'cream-100': '#FEF6E6',
-  'cream-200': '#FFF6E0',
-  'cream-400': '#FAE0AF',
-  chalk: '#F4F4F2',
-  'blue-50': '#EFF1FF',
-  'blue-100': '#DADEFF',
-  'blue-200': '#B7BFFF',
-  pandan: '#5FE0A4',
-  gula: '#FFC24D',
-  ais: '#4FDDDD',
-  ube: '#CDBCFF',
-  teh: '#FFB08A',
-  'rule-reversed': '#4A4136',
-} as const;
-
-export const groundToken: Record<Ground, string> = {
-  paper: 'var(--cjt-color-paper)',
-  'cream-100': 'var(--cjt-color-cream-100)',
-  'cream-400': 'var(--cjt-color-cream)',
-  chalk: 'var(--cjt-color-chalk)',
-  ink: 'var(--cjt-color-ink)',
-  'blue-50': 'var(--cjt-color-blue-50)',
-  'blue-100': 'var(--cjt-color-blue-100)',
-  'blue-200': 'var(--cjt-color-blue-200)',
-  pandan: 'var(--cjt-color-pandan)',
-  gula: 'var(--cjt-color-gula)',
-  ais: 'var(--cjt-color-ais)',
-  ube: 'var(--cjt-color-ube)',
-  teh: 'var(--cjt-color-teh)',
-};
-
-export const inkToken: Record<TextInk, string> = {
-  ink: 'var(--cjt-color-ink)',
-  blue: 'var(--cjt-color-blue)',
-  muted: 'var(--cjt-color-muted)',
-  paper: 'var(--cjt-color-paper)',
-  cream: 'var(--cjt-color-cream)',
-  pink: 'var(--cjt-color-pink)',
-  'ink-60': 'color-mix(in srgb, var(--cjt-color-ink) 60%, transparent)',
-};
+export type Ground = Extract<ColorName, 'paper' | 'cream-100' | 'cream-400' | 'chalk' | 'ink' | 'blue' | 'blue-50' | 'blue-100' | 'blue-200'> | Flavour;
 
 /**
- * Which text colours may sit on which ground, for body-size text (AA 4.5:1).
+ * A colour text can be set in. `ink-60` is ink at 60% opacity (sheet 05, on cream-400);
+ * `ink-muted` is the warm grey of the menu board's English (Mock up 03).
+ */
+export type TextInk = Extract<ColorName, 'ink' | 'blue' | 'muted' | 'paper' | 'cream-400' | 'pink' | 'ink-muted'> | 'ink-60';
+
+/**
+ * Which text colours may sit on which ground, for body-size text (AA 4.5:1). The
+ * first is the ground's primary voice.
  * Sheet 05: paper takes ink, blue, muted; cream-400 takes ink and blue, muted is
  * illegal there (use ink-60); ink takes paper, cream and pink, never blue.
+ * Mock up 03: on ink the text is cream, and English sits in the warm grey (ink-muted).
  * Sheet 06: blue-50 and blue-100 take ink and blue; blue-200 takes ink only for
- * body; every flavour takes ink, with a cobalt wordmark.
+ * body; every flavour takes ink. The typeset wordmark is identity, not text, and
+ * follows `wordmarkInk` instead.
  * cream-100 and chalk are not on sheet 05; their entries are set by measured contrast
- * (muted fails on both, so the Never tag on chalk uses ink-60).
+ * (muted fails on both, so the Never tag on chalk uses ink-60). Blue is the awning:
+ * the only thing Paper sets on it is cream.
  */
 export const legalText = {
   paper: ['ink', 'blue', 'muted'],
   'cream-100': ['ink', 'blue'],
   'cream-400': ['ink', 'blue', 'ink-60'],
   chalk: ['ink', 'blue', 'ink-60'],
-  ink: ['paper', 'cream', 'pink'],
+  ink: ['cream-400', 'paper', 'pink', 'ink-muted'],
+  blue: ['cream-400'],
   'blue-50': ['ink', 'blue'],
   'blue-100': ['ink', 'blue'],
   'blue-200': ['ink'],
@@ -91,7 +43,17 @@ export const legalText = {
   teh: ['ink'],
 } as const satisfies Record<Ground, readonly TextInk[]>;
 
-export type LegalText<G extends Ground> = (typeof legalText)[G][number];
+/**
+ * The receding voice on a ground: muted on paper, ink at 60% where muted fails, warm
+ * grey on ink. Where the table allows no receding ink, the primary voice carries it.
+ */
+export function secondaryInk(ground: Ground): TextInk {
+  const legal: readonly TextInk[] = legalText[ground];
+  return (['muted', 'ink-60', 'ink-muted'] as const).find((ink) => legal.includes(ink)) ?? legal[0];
+}
+
+/** Sheets 04 and 06: the wordmark is cobalt on every light ground, cream where cobalt cannot read. */
+export const wordmarkInk = (ground: Ground): Extract<TextInk, 'blue' | 'cream-400'> => (ground === 'ink' || ground === 'blue' ? 'cream-400' : 'blue');
 
 /** Sheet 05 "Four things that are never done", as pairs that must stay below AA. */
 export const forbiddenText: ReadonlyArray<{ink: TextInk; ground: Ground; reason: string}> = [
@@ -106,17 +68,10 @@ export const forbiddenText: ReadonlyArray<{ink: TextInk; ground: Ground; reason:
  * ground lighter than the fill: paper or cream-100. Lettering is filled outline.
  */
 export type Engine = 'alive' | 'edible' | 'lettering';
-export type GroundFor<E extends Engine> = E extends 'edible' ? 'paper' | 'cream-100' : Ground;
-
-/** Sheets 04 and 14: below these rendered sizes an asset switches to its fallback. */
-export const minSize = {
-  drawnWordmark: 180,
-  crownedLockup: 240,
-  edibleObject: 64,
-  pinkAccent: 40,
-  // Burung Tiung: the small-size icon (heavier lines, no texture) is for 32px and under.
-  birdIcon: 32,
-} as const;
+export const edibleGrounds = ['paper', 'cream-100'] as const satisfies readonly Ground[];
+export type GroundFor<E extends Engine> = E extends 'edible' ? (typeof edibleGrounds)[number] : Ground;
+/** A drawing and a ground it may legally sit on. */
+export type Staged = {[E in Engine]: {engine: E; ground: GroundFor<E>}}[Engine];
 
 /** WCAG 2 relative luminance contrast between two #RRGGBB colours. */
 export function contrast(a: string, b: string): number {
@@ -133,12 +88,11 @@ export function contrast(a: string, b: string): number {
 
 /** Resolves a text ink to the hex it renders as on a given ground (ink-60 is blended). */
 export function renderedHex(ink: TextInk, ground: Ground): string {
-  if (ink !== 'ink-60') return hex[ink];
-  const g = hex[ground];
+  if (ink !== 'ink-60') return color[ink];
   const mix = (i: number) => {
-    const fg = parseInt(hex.ink.slice(i, i + 2), 16);
-    const bg = parseInt(g.slice(i, i + 2), 16);
-    return Math.round(fg * 0.6 + bg * 0.4).toString(16).padStart(2, '0');
+    const fg = parseInt(color.ink.slice(i, i + 2), 16);
+    const bg = parseInt(color[ground].slice(i, i + 2), 16);
+    return Math.round(fg * inkSoftAlpha + bg * (1 - inkSoftAlpha)).toString(16).padStart(2, '0');
   };
   return `#${mix(1)}${mix(3)}${mix(5)}`.toUpperCase();
 }

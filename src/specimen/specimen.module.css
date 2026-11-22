@@ -1,32 +1,15 @@
-/* The specimen follows the Grammar sheet scaffold: 96 gutters, 1248 content, 128 between sections. */
-.sheet {
-  display: flex;
-  flex-direction: column;
-  gap: var(--cjt-space-3xl);
-  max-width: var(--cjt-container-sheet);
-  margin-inline: auto;
-  padding: var(--cjt-space-2xl) var(--cjt-space-gutter) var(--cjt-space-3xl);
-  box-sizing: border-box;
-  background: var(--cjt-color-paper);
-}
-.section { display: flex; flex-direction: column; gap: var(--cjt-space-lg); }
-
-.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cjt-space-md); }
-.triple { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cjt-space-md); }
-.five { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--cjt-space-md); }
-
 .blueBand {
   display: flex;
   justify-content: center;
   padding: var(--cjt-space-xl) var(--cjt-space-md);
-  background: var(--cjt-color-blue);
 }
 
 .sizes { display: flex; align-items: flex-end; gap: var(--cjt-space-xl); flex-wrap: wrap; }
 .sizeStep { margin: 0; display: flex; flex-direction: column; gap: var(--cjt-space-sm); align-items: flex-start; }
 .sizeArt { display: flex; align-items: flex-end; }
 
-.illegal { display: flex; width: 100%; height: 100%; padding: var(--cjt-space-md); box-sizing: border-box; }
+/* The forbidden ground fills the Verdict's stage; --art-h is the stage's own art height. */
+.illegal { display: flex; justify-content: center; width: 100%; height: var(--art-h); padding: var(--cjt-space-md); box-sizing: border-box; }
 
 .grounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--cjt-space-sm); }
 .groundTile {
@@ -37,34 +20,20 @@
   min-height: 160px;
   padding: var(--cjt-space-md);
   box-sizing: border-box;
+  margin: 0;
 }
-.groundTile[data-outlined] { box-shadow: inset 0 0 0 1px var(--cjt-color-rule); }
 .groundInks { display: flex; flex-direction: column; gap: 4px; }
-.groundInk {
-  font-family: var(--font-family-body);
-  font-size: var(--cjt-text-body);
-  line-height: var(--cjt-leading-body);
-}
+/* The ink name sits on the sample's baseline, one step down. */
 .groundInkName { font-size: var(--cjt-text-caption); }
 
-/* Grammar sheet 04 scale rows: 28 block padding, 24 gap, rule below */
-.scale { list-style: none; margin: 0; padding: 0; }
-.scaleRow {
-  display: flex;
-  align-items: baseline;
-  gap: var(--cjt-space-md);
-  padding-block: 28px;
-  border-bottom: 1px solid var(--cjt-color-rule);
-}
+/* Grammar sheet 04 scale rows: 28 block padding */
+.scale { composes: list from '../system/components.module.css'; }
+.scaleRow { composes: row from '../system/components.module.css'; align-items: baseline; padding-block: 28px; }
 .scaleName { flex: 0 0 160px; }
 .scaleSpec { flex: 0 0 240px; }
 
-.stack { display: flex; flex-direction: column; align-items: center; gap: var(--cjt-space-sm); }
-.inline { display: flex; align-items: center; gap: var(--cjt-space-sm); flex-wrap: wrap; }
 .vocab {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  composes: list from '../system/components.module.css';
   display: flex;
   flex-wrap: wrap;
   gap: var(--cjt-space-sm) var(--cjt-space-lg);
@@ -72,13 +41,7 @@
 .boardWrap { max-width: 700px; }
 .form { max-width: 420px; }
 
-.footer { display: flex; flex-direction: column; gap: var(--cjt-space-md); }
-.footRow { display: flex; justify-content: space-between; align-items: baseline; gap: var(--cjt-space-sm); flex-wrap: wrap; }
-
 @media (max-width: 899px) {
-  .sheet { padding: var(--cjt-space-xl) var(--cjt-space-sm); gap: var(--cjt-space-2xl); }
-  .pair, .triple { grid-template-columns: minmax(0, 1fr); }
-  .five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scaleRow { flex-wrap: wrap; row-gap: var(--cjt-space-xs); }
   .scaleName, .scaleSpec { flex-basis: auto; }
 }

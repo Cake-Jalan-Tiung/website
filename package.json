@@ -11,6 +11,7 @@
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "marks": "node scripts/build-marks.mjs",
     "spec": "node scripts/spec-check.mjs",
+    "fit": "node scripts/fit-check.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -20,17 +20,3 @@ declare module '@astryxdesign/core/ProgressBar' {
     'disabled': true;
   }
 }
-
-declare module '@astryxdesign/core/Card' {
-  interface CardVariantMap {
-    'cream': true;
-    'cream-light': true;
-    'chalk': true;
-    'ink': true;
-    'pandan': true;
-    'gula': true;
-    'ais': true;
-    'ube': true;
-    'teh': true;
-  }
-}

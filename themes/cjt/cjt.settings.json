@@ -148,18 +148,60 @@
       "source": "property",
       "on": "heading",
       "when": "level:3"
+    },
+    {
+      "thing": "--color-background-inverted",
+      "value": "#111111",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "--color-icon-primary",
+      "value": "#111111",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "--color-on-accent",
+      "value": "#FAE0AF",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "color",
+      "value": "var(--color-text-accent)",
+      "source": "property",
+      "on": "button",
+      "when": "variant:secondary"
+    },
+    {
+      "thing": "color",
+      "value": "var(--color-text-accent)",
+      "source": "property",
+      "on": "button",
+      "when": "variant:ghost"
+    },
+    {
+      "thing": "background-color",
+      "value": "transparent",
+      "source": "property",
+      "on": "button",
+      "when": "variant:secondary"
+    },
+    {
+      "thing": "box-shadow",
+      "value": "inset 0 0 0 1px var(--color-accent)",
+      "source": "property",
+      "on": "button",
+      "when": "variant:secondary"
+    },
+    {
+      "thing": "--color-accent-muted",
+      "value": "#DADEFF",
+      "source": "token",
+      "mode": "light"
     }
   ],
-  "lifted": [
-    "card variant:cream border-color",
-    "card variant:cream-light border-color",
-    "card variant:chalk border-color",
-    "card variant:ink border-color",
-    "card variant:pandan border-color",
-    "card variant:gula border-color",
-    "card variant:ais border-color",
-    "card variant:ube border-color",
-    "card variant:teh border-color"
-  ],
+  "lifted": [],
   "palette": "ced442abd9a6599626d6fb57707726232c578944c936d21e28d859f9c62fe5d0"
 }
