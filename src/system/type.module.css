@@ -1,0 +1,63 @@
+/* Grammar sheet 04: the six-step scale. Every brand component sets type through these. */
+.label {
+  font-family: var(--font-family-body);
+  font-size: var(--cjt-text-label);
+  line-height: var(--cjt-leading-label);
+  font-weight: var(--cjt-weight-regular);
+  letter-spacing: var(--cjt-tracking-caps);
+  text-transform: uppercase;
+}
+.caption {
+  font-family: var(--font-family-body);
+  font-size: var(--cjt-text-caption);
+  line-height: var(--cjt-leading-caption);
+  font-weight: var(--cjt-weight-regular);
+}
+.body {
+  font-family: var(--font-family-body);
+  font-size: var(--cjt-text-body);
+  line-height: var(--cjt-leading-body);
+  font-weight: var(--cjt-weight-regular);
+}
+.subhead {
+  font-family: var(--font-family-body);
+  font-size: var(--cjt-text-subhead);
+  line-height: var(--cjt-leading-subhead);
+  font-weight: var(--cjt-weight-regular);
+}
+.head {
+  font-family: var(--font-family-body);
+  font-size: var(--cjt-text-head);
+  line-height: var(--cjt-leading-head);
+  font-weight: var(--cjt-weight-medium);
+  letter-spacing: var(--cjt-tracking-tight);
+}
+/* 68/70 from 1440 wide; scales down to Astryx's phone display size (45px), keeping the +2px leading. */
+.display {
+  --display-size: clamp(2.8125rem, 4.73vw, var(--cjt-text-display));
+  font-family: var(--font-family-body);
+  font-size: var(--display-size);
+  line-height: calc(var(--display-size) + 0.125rem);
+  font-weight: var(--cjt-weight-medium);
+  letter-spacing: var(--cjt-tracking-tight);
+}
+.wordmark {
+  font-family: var(--font-family-body);
+  font-weight: var(--cjt-weight-medium);
+  letter-spacing: var(--cjt-tracking-caps-wide);
+  text-transform: uppercase;
+}
+
+.ink { color: var(--cjt-color-ink); }
+.muted { color: var(--cjt-color-muted); }
+.blue { color: var(--cjt-color-blue); }
+.paper { color: var(--cjt-color-paper); }
+.cream { color: var(--cjt-color-cream); }
+.pink { color: var(--cjt-color-pink); }
+.ink-60 { color: color-mix(in srgb, var(--cjt-color-ink) 60%, transparent); }
+.inkMuted { color: var(--cjt-color-ink-muted); }
+
+.reset {
+  margin: 0;
+  padding: 0;
+}

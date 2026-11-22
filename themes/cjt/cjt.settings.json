@@ -1,0 +1,165 @@
+{
+  "name": "cjt",
+  "like": "neutral",
+  "mode": "light-only",
+  "settings": [
+    {
+      "thing": "accent",
+      "value": "#031CFE",
+      "source": "dial"
+    },
+    {
+      "thing": "neutral",
+      "value": "#767676",
+      "source": "dial"
+    },
+    {
+      "thing": "--color-background-body",
+      "value": "#FFFFFF",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "corners",
+      "value": "square",
+      "source": "dial"
+    },
+    {
+      "thing": "text-size",
+      "value": "large",
+      "source": "dial"
+    },
+    {
+      "thing": "headings",
+      "value": "medium",
+      "source": "dial",
+      "axis": "weight"
+    },
+    {
+      "thing": "surfaces",
+      "value": "outlined",
+      "source": "dial"
+    },
+    {
+      "thing": "--color-text-primary",
+      "value": "#111111",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "--color-border",
+      "value": "#E4E4E4",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "--color-background-muted",
+      "value": "#F4F4F2",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "--text-display-1-size",
+      "value": "4.25rem",
+      "source": "token"
+    },
+    {
+      "thing": "--text-display-1-leading",
+      "value": "1.03",
+      "source": "token"
+    },
+    {
+      "thing": "--text-heading-1-size",
+      "value": "2.5rem",
+      "source": "token"
+    },
+    {
+      "thing": "--text-heading-1-leading",
+      "value": "1.05",
+      "source": "token"
+    },
+    {
+      "thing": "--color-text-secondary",
+      "value": "#6d6d6d",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "font",
+      "value": "\"Jost Variable\", system-ui, sans-serif",
+      "source": "dial"
+    },
+    {
+      "thing": "letter-spacing",
+      "value": "-0.03em",
+      "source": "property",
+      "on": "heading"
+    },
+    {
+      "thing": "--text-supporting-leading",
+      "value": "1.2308",
+      "source": "token"
+    },
+    {
+      "thing": "--text-heading-3-size",
+      "value": "1.5rem",
+      "source": "token"
+    },
+    {
+      "thing": "--text-heading-3-leading",
+      "value": "1.1667",
+      "source": "token"
+    },
+    {
+      "thing": "--shadow-low",
+      "value": "none",
+      "source": "token"
+    },
+    {
+      "thing": "--shadow-med",
+      "value": "none",
+      "source": "token"
+    },
+    {
+      "thing": "--shadow-high",
+      "value": "none",
+      "source": "token"
+    },
+    {
+      "thing": "--shadow-inset-hover",
+      "value": "inset 0 0 0 2px #031CFE4D",
+      "source": "token"
+    },
+    {
+      "thing": "--shadow-inset-selected",
+      "value": "inset 0 0 0 2px #031CFE80",
+      "source": "token"
+    },
+    {
+      "thing": "font-weight",
+      "value": "400",
+      "source": "property",
+      "on": "heading",
+      "when": "level:3"
+    },
+    {
+      "thing": "letter-spacing",
+      "value": "0em",
+      "source": "property",
+      "on": "heading",
+      "when": "level:3"
+    }
+  ],
+  "lifted": [
+    "card variant:cream border-color",
+    "card variant:cream-light border-color",
+    "card variant:chalk border-color",
+    "card variant:ink border-color",
+    "card variant:pandan border-color",
+    "card variant:gula border-color",
+    "card variant:ais border-color",
+    "card variant:ube border-color",
+    "card variant:teh border-color"
+  ],
+  "palette": "ced442abd9a6599626d6fb57707726232c578944c936d21e28d859f9c62fe5d0"
+}

@@ -1,0 +1,7 @@
+node_modules
+dist
+themes/cjt/preview.html
+themes/cjt/*.png
+.pnpm-store
+*.tsbuildinfo
+themes/cjt/sheet*.html

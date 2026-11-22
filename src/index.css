@@ -1,0 +1,5 @@
+/* Astryx's Theme sets tokens but does not paint the page; give the document its ground. */
+html {
+  background: var(--color-background-body);
+  color: var(--color-text-primary);
+}
