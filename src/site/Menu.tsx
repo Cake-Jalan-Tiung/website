@@ -1,7 +1,10 @@
 import {Button} from '@astryxdesign/core/Button';
+import {Link} from '@astryxdesign/core/Link';
 import {Band, Page, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {MenuList, Sections, StoreFooter, StoreHeader, StoreSection} from '../storefront/sections';
+import {BagBar} from '../storefront/bag';
+import {formatSpan} from '../storefront/hours';
 import {storefront} from './content';
 
 /** The whole menu, one section per category, with a jump to each and the ways to order. */
@@ -18,10 +21,15 @@ export function Menu() {
               {storefront.hoursLine}
             </Type>
           </Stack>
-          <Row gap="sm">
-            <Button variant="primary" size="lg" href={storefront.order.delivery.href} label="Order for delivery" />
-            <Button variant="secondary" size="lg" href={storefront.order.pickup.href} label="Order for pick-up" />
-          </Row>
+          <Type role="body" as="p">
+            Add what you like, pay online, and collect it at the counter.
+            {storefront.delivery ? (
+              <>
+                {' '}
+                For delivery, <Link href={storefront.delivery.href}>order on Beep</Link>.
+              </>
+            ) : null}
+          </Type>
           <Row as="nav" gap="xs" aria-label="Categories">
             {storefront.categories.map((category) => (
               <Button key={category.id} variant="ghost" size="sm" href={`#${category.id}`} label={category.name} />
@@ -31,11 +39,12 @@ export function Menu() {
       </Band>
       <Sections>
         {storefront.categories.map((category) => (
-          <StoreSection key={category.id} id={category.id} title={category.name} note={category.note}>
+          <StoreSection key={category.id} id={category.id} title={category.name} note={category.servedBetween && formatSpan(category.servedBetween)}>
             <MenuList dishes={category.dishes} store={storefront} />
           </StoreSection>
         ))}
       </Sections>
+      <BagBar store={storefront} />
     </Page>
   );
 }

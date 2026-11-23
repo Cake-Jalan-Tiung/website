@@ -3,6 +3,7 @@
 import type {ComponentType} from 'react';
 import type {MarkProps} from '../marks/marks.generated';
 import type {Flavour, Staged} from '../system/model';
+import type {Span} from './hours';
 
 /** A drawing on a ground it may legally sit on (Law 04 holds through `Staged`). */
 export type Drawing = Staged & {mark: ComponentType<MarkProps>};
@@ -16,13 +17,17 @@ export type Dish = {id: string; name: string; description?: string; price: numbe
 /**
  * A kind of thing the shop sells. Its dishes live inside it, so nothing points at a missing
  * category. `cover` is the dish whose photo stands in until the category has its own.
+ * `servedBetween` limits when its dishes can be picked up (breakfast only in the morning).
  */
-export type Category = {id: string; name: string; tile: Drawing; dishes: readonly Dish[]; note?: string; cover?: string};
+export type Category = {id: string; name: string; tile: Drawing; dishes: readonly Dish[]; servedBetween?: Span; cover?: string};
 
 export type Action = {label: string; href: string};
 
-/** One line per day, Monday first; `null` is closed. */
-export type Week = readonly {day: string; hours: string | null}[];
+/** One line per day, Monday first; `open: null` is closed. */
+export type Week = readonly {day: string; open: Span | null}[];
+
+/** How pick-up times are offered: the soonest after paying, the step between times, how many days ahead. */
+export type Pickup = {leadMinutes: number; slotMinutes: number; daysAhead: number};
 
 /** A public rating, with where and when it was read, so it can be checked and kept current. */
 export type Proof = {rating: number; reviews: number; source: string; asOf: string; href: string};
@@ -39,8 +44,9 @@ export type Storefront = {
   /** The passing line over the header: short, true, and current. */
   announcements: readonly string[];
   nav: readonly Action[];
-  /** Where an order is placed, one way per fulfilment. */
-  order: {delivery: Action; pickup: Action};
+  /** Where to order delivery while the site only takes pick-up orders; omit once it delivers. */
+  delivery?: Action;
+  /** The menu, which is also where an order starts. */
   menu: Action;
   /** Short facts under the hero; each must be true and checkable. */
   facts: readonly {title: string; line: string}[];
@@ -54,16 +60,30 @@ export type Storefront = {
   /** The season's dish, when the shop has one. */
   inSeason?: {flavour: Flavour; dishId: string};
   mapHref: string;
+  /** The shop's IANA time zone: "today", opening hours and pick-up times are read in it, not in the server's. */
+  timeZone: string;
+  pickup: Pickup;
 };
 
 export const allDishes = (store: Storefront) => store.categories.flatMap((category) => category.dishes);
 
+const indexes = new WeakMap<Storefront, ReadonlyMap<string, Dish>>();
+/** Every dish by id, built once per storefront. */
+export function dishIndex(store: Storefront): ReadonlyMap<string, Dish> {
+  let index = indexes.get(store);
+  if (!index) {
+    index = new Map(allDishes(store).map((dish) => [dish.id, dish]));
+    indexes.set(store, index);
+  }
+  return index;
+}
+
 /** Dishes by id, in the order given; throws on an id that names no dish, so a typo fails loudly. */
 export function dishesById(store: Storefront, ids: readonly string[]): Dish[] {
-  const dishes = allDishes(store);
   return ids.map((id) => {
-    const dish = dishes.find((d) => d.id === id);
+    const dish = dishIndex(store).get(id);
     if (!dish) throw new Error(`storefront: no dish has the id "${id}"`);
     return dish;
   });
 }
+

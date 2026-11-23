@@ -130,3 +130,28 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
 @media (max-width: 399px) {
   .brandName { display: none; }
 }
+
+/* The bag: a stepper in place of Add once a dish is in it, and a bar that stays at the foot of
+   the screen until the footer, so it never covers the last of the page. */
+.stepper { display: inline-flex; align-items: center; gap: var(--cjt-space-xs); align-self: flex-start; }
+.stepperCount { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.menuBuy { display: flex; flex-direction: column; align-items: flex-end; gap: var(--cjt-space-sm); flex-shrink: 0; margin-inline-start: auto; }
+.bagBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--cjt-color-paper);
+  border-top: 1px solid var(--cjt-color-rule);
+}
+.bagBarInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjt-space-md);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding: var(--cjt-space-sm) var(--cjt-space-gutter);
+}
+@media (max-width: 1199px) { .bagBarInner { padding-inline: var(--cjt-space-lg); } }
+@media (max-width: 899px) { .bagBarInner { padding-inline: var(--cjt-space-sm); } }

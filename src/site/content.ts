@@ -52,18 +52,14 @@ export const inSeason: {flavour: Flavour; item: MenuItem} = {flavour: 'pandan', 
 // Not from Paper: the storefront is in English at the owner's request, so it does not use the
 // Malay-first vocabulary in `labels` or the untranslatable "Habis bila habis".
 
-// Orders go through the shop's Beep store (StoreHub). Beep cannot link to a single item,
-// so every order action opens the store for delivery or for pick-up.
+// Pick-up orders are placed and paid on this site. Delivery stays on the shop's Beep store
+// until the site delivers; Beep cannot link to a single item, so that link opens the store.
 const beep = 'https://cakejalantiung.beepit.com/ordering/';
 
 // The Google Maps listing "Cake Jalan Tiung Seksyen 4", read on 23 November 2026:
 // hours, phone, rating and review count.
 const googleListing = 'https://maps.google.com/?cid=3539512419364173597';
 
-const order = {
-  delivery: {label: 'Delivery', href: `${beep}?type=delivery`},
-  pickup: {label: 'Pick up', href: `${beep}?type=pickup`},
-} as const;
 
 // The menu as the Beep store listed it on 23 November 2026: names, descriptions and prices
 // copied from it, sections in its order. Beep's "Replace with Oat Milk" is an add-on, not a dish,
@@ -74,26 +70,26 @@ export const storefront: Storefront = {
   address: address.lines,
   phone: {display: '012-878 7258', href: 'tel:+60128787258'},
   week: [
-    {day: 'Monday', hours: '8am – 6pm'},
-    {day: 'Tuesday', hours: '8am – 6pm'},
-    {day: 'Wednesday', hours: '8am – 6pm'},
-    {day: 'Thursday', hours: null},
-    {day: 'Friday', hours: '8am – 6pm'},
-    {day: 'Saturday', hours: '8am – 6pm'},
-    {day: 'Sunday', hours: '8am – 6pm'},
+    {day: 'Monday', open: ['08:00', '18:00']},
+    {day: 'Tuesday', open: ['08:00', '18:00']},
+    {day: 'Wednesday', open: ['08:00', '18:00']},
+    {day: 'Thursday', open: null},
+    {day: 'Friday', open: ['08:00', '18:00']},
+    {day: 'Saturday', open: ['08:00', '18:00']},
+    {day: 'Sunday', open: ['08:00', '18:00']},
   ],
   hoursLine: 'Open 8am – 6pm · Closed Thursdays',
   signOff,
-  announcements: ['Open 8am – 6pm · Closed Thursdays', 'Breakfast 8:30am – 12pm', 'Delivery and pick-up on Beep'],
+  announcements: ['Open 8am – 6pm · Closed Thursdays', 'Breakfast 8:30am – 12pm', 'Order online, collect at the counter'],
   nav: [
-    {label: 'Menu', href: '/menu.html'},
+    {label: 'Menu', href: '/menu'},
     {label: 'Best sellers', href: '/#best-sellers'},
     {label: 'Visit', href: '/#visit'},
   ],
-  order,
-  menu: {label: 'See the menu', href: '/menu.html'},
+  delivery: {label: 'Delivery on Beep', href: `${beep}?type=delivery`},
+  menu: {label: 'See the menu', href: '/menu'},
   facts: [
-    {title: 'Delivery or pick-up', line: 'Order online through Beep.'},
+    {title: 'Order ahead', line: 'Pay online, collect at the counter.'},
     {title: 'Open six days', line: '8am to 6pm. Closed on Thursdays.'},
     {title: 'Breakfast till noon', line: 'Served 8:30am to 12pm.'},
     {title: 'Section 4, Shah Alam', line: '9, Jln Sukun 4/7.'},
@@ -158,7 +154,7 @@ export const storefront: Storefront = {
       id: 'breakfast',
       name: 'Breakfast',
       cover: 'classic-big-breakfast',
-      note: '8:30am – 12:00pm',
+      servedBetween: ['08:30', '12:00'],
       tile: {engine: 'alive', ground: 'chalk', mark: BurungTiung},
       dishes: [
         {id: 'classic-big-breakfast', name: 'Classic Big Breakfast', price: 34, description: 'Sourdough bread, grilled potatoes, artisanal beef sausage, scrambled eggs, cherry tomatoes and salads'},
@@ -184,4 +180,7 @@ export const storefront: Storefront = {
   // Beep's own Best Seller list, in its order.
   bestSellers: ['london-to-shah-alam', 'shio-pan', 'dubai-chewy-cookie', 'butter-tteok'],
   mapHref: googleListing,
+  timeZone: 'Asia/Kuala_Lumpur',
+  // Assumed until the shop confirms how long an order takes to be ready.
+  pickup: {leadMinutes: 20, slotMinutes: 15, daysAhead: 2},
 };

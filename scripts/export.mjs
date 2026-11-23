@@ -42,7 +42,7 @@ async function open(browser, url, deviceScaleFactor) {
 const failures = await withServer(async (base) => {
   mkdirSync(OUT, {recursive: true});
   const browser = await chromium.launch();
-  const url = `${base}/export.html`;
+  const url = `${base}/export`;
   const index = await open(browser, url, 1);
   const pieces = await index.page.$$eval('[data-export]', (els) => els.map((el) => ({id: el.dataset.export, posted: el.dataset.posted, scale: Number(el.dataset.scale)})));
   const failed = [...index.errors];

@@ -8,29 +8,35 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "cf workers types && tsc -b && cf build",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
+    "typecheck": "cf workers types && tsc -b",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "marks": "node scripts/build-marks.mjs",
     "spec": "node scripts/spec-check.mjs",
     "fit": "node scripts/fit-check.mjs",
     "export": "node scripts/export.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy": "cf deploy",
+    "db:migrate:local": "cf d1 migrations apply 00000000-0000-4000-8000-00000000c1d1 --local"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.17",
     "@astryxdesign/theme-neutral": "0.7.17",
     "@fontsource-variable/jost": "5.3.0",
     "@stylexjs/stylex": "0.19.2",
+    "@tanstack/react-router": "^1.170.46",
+    "@tanstack/react-start": "^1.169.7",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@astryxdesign/cli": "0.7.17",
+    "@cloudflare/vite-plugin": "2.0.0-rc.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
+    "cf": "1.0.0-rc.2",
     "playwright-core": "1.65.1",
     "typescript": "7.0.2",
     "vite": "8.3.8",

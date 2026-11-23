@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local work. PAYMENTS=fake uses the built-in test payment page; set
+# PAYMENTS=chip with the client's CHIP test key and CHIP_BRAND_ID to use CHIP's test mode.
+PAYMENTS=fake
+CHIP_BRAND_ID=
+CHIP_SECRET_KEY=
+STAFF_PIN=246810
+SESSION_SECRET=generate-with-openssl-rand-hex-32

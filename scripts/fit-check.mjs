@@ -7,7 +7,7 @@
 import {spawn} from 'node:child_process';
 import {chromium} from 'playwright-core';
 
-const PAGES = ['/', '/menu.html', '/design-system.html', '/stress.html'];
+const PAGES = ['/', '/menu', '/checkout', '/staff', '/design-system', '/stress'];
 const WIDTHS = [320, 390, 768, 900, 1024, 1440];
 
 async function withServer(run) {

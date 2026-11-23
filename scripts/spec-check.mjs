@@ -2,7 +2,7 @@
 // Every expectation names its source: C = Concept page, G## = Grammar sheet, M = Mock up.
 //
 //   pnpm spec                         builds, serves dist with vite preview, checks
-//   SPEC_URL=http://localhost:5179/design-system.html pnpm spec   checks a running server
+//   SPEC_URL=http://localhost:5179/design-system pnpm spec   checks a running server
 import {spawn} from 'node:child_process';
 import {chromium} from 'playwright-core';
 
@@ -73,7 +73,7 @@ async function withServer(run) {
     server.on('exit', (code) => reject(new Error(`vite preview exited ${code}`)));
   });
   try {
-    return await run('http://localhost:4179/design-system.html');
+    return await run('http://localhost:4179/design-system');
   } finally {
     server.kill();
   }

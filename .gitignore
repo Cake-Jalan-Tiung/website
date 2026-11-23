@@ -6,3 +6,7 @@ themes/cjt/*.png
 *.tsbuildinfo
 themes/cjt/sheet*.html
 exports
+.cloudflare
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

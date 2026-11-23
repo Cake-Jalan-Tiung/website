@@ -4,10 +4,11 @@ The brand from the Paper file "Cake Jalan Tiung" (pages Concept, Grammar and Moc
 
 ```bash
 pnpm install
-pnpm dev        # site at /, its menu at /menu.html, design system at /design-system.html, worst case at /stress.html
-pnpm test       # brand rules as unit tests (colour pairings, Law 04, theme colours)
+pnpm dev        # TanStack Start on the Workers runtime: site at /, menu at /menu, design system at /design-system, worst case at /stress
+pnpm db:migrate:local   # once, after copying .dev.vars.example to .dev.vars
+pnpm test       # brand rules, order rules (prices, pick-up times, status moves) and the CHIP signature check
 pnpm spec       # rendered components against Paper's measurements, in headless Chromium
-pnpm fit        # all three pages at six widths; fails if anything overflows
+pnpm fit        # every page at six widths; fails if anything overflows
 pnpm export     # the social posts and the receipt header as PNGs at the size they are used, into exports/
 python3 scripts/print-colours.py   # CMYK for coated stock and its error, into src/system/print.generated.ts
 pnpm build
@@ -47,10 +48,10 @@ Each layer reads only the ones above it.
 | `Artboard`, `ArtboardTile` | Ours: a piece drawn at a fixed size, and that piece shrunk to fit a chalk stage |
 
 6. **Pages.** Built from layers 4 and 5; they hold no styling of their own beyond a few specimen-only measurements. Copy lives in `src/site/content.ts`, and no page states a brand line that is not in it or in Paper.
-   - **The site** (`index.html`, `menu.html` → `src/site/`) is an F&B storefront in English, laid out like a DTC food shop rather than the brand book: a passing line on ink, one slim sticky header (bird and wordmark, Menu, Best sellers, Visit, Order now), a hero with the Google rating and two actions, four facts, the best sellers as cards with an Order button each, photo tiles per category, the season's dish when there is one, the visit band (hours by day, address, phone, Google Maps, pick up or delivery), and a footer. The menu page is every category as hairline rows. Orders go to the shop's Beep store (StoreHub), which holds the cart and checkout; Beep cannot link to a single item, so every order action opens the store with `?type=delivery` or `?type=pickup`. Both pages compose `src/storefront/` (below) with the shop's content from `content.ts`.
-   - **The design system** (`design-system.html` → `src/specimen/DesignSystem.tsx`) is laid out as a brand book: a cobalt cover, the statement beside the bird, nine chapters that each open with a display title and the brand's own line, the grounds as full-width fields named for the objects they came from, the menu board on ink, then the applications: packaging, social and the counter, each piece an `Artboard` at its drawn size. Inside the chapters the components keep Paper's measurements.
-   - **The worst-case page** (`stress.html` → `src/specimen/Stress.tsx`) is dev only.
-   - **The export page** (`export.html` → `Exports` in `src/specimen/Applications.tsx`) is dev only: each exportable piece unscaled, for `pnpm export` to photograph at its own scale (3× for social, 576 / 272 for the receipt header). It checks every PNG against the size the piece says it is used at.
+   - **The site** (routes `/` and `/menu` → `src/site/`) is an F&B storefront in English, laid out like a DTC food shop rather than the brand book: a passing line on ink, one slim sticky header (bird and wordmark, Menu, Best sellers, Visit, and Order now or the bag), a hero with the Google rating and two actions, four facts, the best sellers as cards with Add on each, photo tiles per category, the season's dish when there is one, the visit band (hours by day, address, phone, Google Maps, pick up or delivery), and a footer. The menu page is every category as hairline rows, each with Add. Pick-up orders are placed and paid on the site (`src/orders/`, plan in `docs/checkout-plan.md`): the bag lives in the browser, `/checkout` offers open pick-up times and payment methods, the payment provider is CHIP (or a local test page with `PAYMENTS=fake`), `/order/<id>` follows the order, and the kitchen works it on `/staff`. Delivery still links to the Beep store. Both pages compose `src/storefront/` (below) with the shop's content from `content.ts`.
+   - **The design system** (route `/design-system` → `src/specimen/DesignSystem.tsx`) is laid out as a brand book: a cobalt cover, the statement beside the bird, nine chapters that each open with a display title and the brand's own line, the grounds as full-width fields named for the objects they came from, the menu board on ink, then the applications: packaging, social and the counter, each piece an `Artboard` at its drawn size. Inside the chapters the components keep Paper's measurements.
+   - **The worst-case page** (route `/stress` → `src/specimen/Stress.tsx`) is dev only.
+   - **The export page** (route `/export` → `Exports` in `src/specimen/Applications.tsx`) is dev only: each exportable piece unscaled, for `pnpm export` to photograph at its own scale (3× for social, 576 / 272 for the receipt header). It checks every PNG against the size the piece says it is used at.
 
 **Storefront** (`src/storefront/`) is the reusable layer for F&B sites. `model.ts` is the shape of a shop (name, address, hours, announcements, nav, an order link per fulfilment, categories that hold their dishes, best sellers, the season's dish if any; `model.test.ts` holds the ids together); `sections.tsx` renders each section from that shape alone, through layers 4 and 5. Another client fills the same shape and brings its own brand layer (values, theme, marks); the sections still name this brand's marks and wordmark, so that layer is swapped with them.
 

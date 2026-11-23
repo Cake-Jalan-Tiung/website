@@ -10,7 +10,9 @@ import {Label, PinkDot, Price, Stage, Tiung, TypesetWordmark} from '../system/co
 import {Band, Columns, Marquee, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
+import {formatSpan, shopClock} from './hours';
 import {photoFor} from './photos';
+import {AddToBag, BagButton} from './bag';
 import s from './storefront.module.css';
 
 /** The passing line over the header: what is true this week, on ink. */
@@ -49,7 +51,7 @@ export function StoreHeader({store}: {store: Storefront}) {
               </Link>
             ))}
           </nav>
-          <Button variant="primary" label="Order now" href={store.order.delivery.href} />
+          <BagButton store={store} />
         </div>
       </Field>
     </>
@@ -118,7 +120,7 @@ export function Hero({title, lede, art, store}: {title: string; lede: string; ar
               {lede}
             </Type>
           </Stack>
-          <Actions primary={{label: 'Order now', href: store.order.delivery.href}} secondary={store.menu} />
+          <Actions primary={{label: 'Order now', href: store.menu.href}} secondary={store.delivery} />
         </Stack>
         <Media id="hero" cover={store.heroCover} alt={store.name} ratio="1 / 1" drawing={art} />
       </Columns>
@@ -175,8 +177,8 @@ export function StoreSection({id, title, note, action, children}: {id: string; t
   );
 }
 
-/** A dish: photo, name, price under it, the start of its description, and a way to order it. */
-function DishCard({dish, orderHref}: {dish: Dish; orderHref: string}) {
+/** A dish: photo, name, price under it, the start of its description, and Add. */
+function DishCard({dish}: {dish: Dish}) {
   return (
     <article className={s.card}>
       <Media id={dish.id} alt={dish.name} ratio="1 / 1" drawing={dish.drawing} />
@@ -193,18 +195,16 @@ function DishCard({dish, orderHref}: {dish: Dish; orderHref: string}) {
           </span>
         ) : null}
       </Stack>
-      <Button variant="secondary" size="sm" label={`Order ${dish.name}`} href={orderHref}>
-        Order
-      </Button>
+      <AddToBag dish={dish} />
     </article>
   );
 }
 
-export function DishGrid({dishes, orderHref}: {dishes: readonly Dish[]; orderHref: string}) {
+export function DishGrid({dishes}: {dishes: readonly Dish[]}) {
   return (
     <Columns count={4} narrow={2} gap="lg">
       {dishes.map((dish) => (
-        <DishCard key={dish.id} dish={dish} orderHref={orderHref} />
+        <DishCard key={dish.id} dish={dish} />
       ))}
     </Columns>
   );
@@ -231,7 +231,7 @@ export function CategoryTiles({categories, menuHref}: {categories: readonly Cate
   );
 }
 
-/** A category's dishes as hairline rows: photo if there is one, name, full description, price. */
+/** A category's dishes as hairline rows: photo if there is one, name, full description, price and Add. */
 export function MenuList({dishes, store}: {dishes: readonly Dish[]; store: Storefront}) {
   return (
     <ul className={s.menuList}>
@@ -251,7 +251,10 @@ export function MenuList({dishes, store}: {dishes: readonly Dish[]; store: Store
               ) : null}
               {store.bestSellers.includes(dish.id) ? <Label ink="blue">Best seller</Label> : null}
             </span>
-            <Price amount={dish.price} />
+            <span className={s.menuBuy}>
+              <Price amount={dish.price} />
+              <AddToBag dish={dish} />
+            </span>
           </li>
         );
       })}
@@ -292,12 +295,9 @@ function Address({lines}: {lines: readonly string[]}) {
   );
 }
 
-/** Monday is 0. */
-const todayIndex = () => (new Date().getDay() + 6) % 7;
-
 /** The week, one row a day, today marked. */
-function WeekHours({week}: {week: Storefront['week']}) {
-  const today = todayIndex();
+function WeekHours({week, timeZone}: {week: Storefront['week']; timeZone: string}) {
+  const today = shopClock(timeZone).dayIndex;
   return (
     <dl className={s.week}>
       {week.map((row, index) => (
@@ -309,8 +309,8 @@ function WeekHours({week}: {week: Storefront['week']}) {
             </Type>
           </dt>
           <dd>
-            <Type role="body" ink={row.hours ? undefined : 'secondary'}>
-              {row.hours ?? 'Closed'}
+            <Type role="body" ink={row.open ? undefined : 'secondary'}>
+              {row.open ? formatSpan(row.open) : 'Closed'}
             </Type>
           </dd>
         </div>
@@ -328,7 +328,7 @@ export function Visit({store, id, art}: {store: Storefront; id: string; art: Dra
           <Type role="head" as="h2" id={id}>
             Visit us
           </Type>
-          <WeekHours week={store.week} />
+          <WeekHours week={store.week} timeZone={store.timeZone} />
           <Stack as="address" gap="sm">
             <Address lines={store.address} />
             <Row gap="md">
@@ -338,7 +338,7 @@ export function Visit({store, id, art}: {store: Storefront; id: string; art: Dra
               </Link>
             </Row>
           </Stack>
-          <Actions primary={store.order.pickup} secondary={store.order.delivery} />
+          <Actions primary={{label: 'Order for pick-up', href: store.menu.href}} secondary={store.delivery} />
         </Stack>
         <Media id="shop" alt={`${store.name} shopfront`} ratio="4 / 3" drawing={art} />
       </Columns>
@@ -383,7 +383,7 @@ export function StoreFooter({store}: {store: Storefront}) {
             ))}
           </FooterColumn>
           <FooterColumn title="Order">
-            {[store.order.delivery, store.order.pickup].map((action) => (
+            {[{label: 'Order for pick-up', href: store.menu.href}, store.delivery].filter((action) => action !== undefined).map((action) => (
               <FooterLink key={action.href} href={action.href}>
                 {action.label}
               </FooterLink>
@@ -400,7 +400,7 @@ export function StoreFooter({store}: {store: Storefront}) {
         </Columns>
         <p className={s.legal}>
           <Type role="caption" ink="secondary">
-            © {new Date().getFullYear()} {store.name}
+            © {shopClock(store.timeZone).year} {store.name}
           </Type>
         </p>
       </Stack>
