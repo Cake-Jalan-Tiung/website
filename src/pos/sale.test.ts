@@ -4,7 +4,7 @@ import {storehub} from '../site/pos';
 import {dishIndex} from '../storefront/model';
 import {storehubTransaction, type PosSale} from './sale';
 
-const shop = {storeId: storehub.storeId, products: storehub.products, timeZone: storefront.timeZone};
+const shop = {storeId: storehub.storeId, paymentMethod: storehub.paymentMethod, products: storehub.products, timeZone: storefront.timeZone};
 
 const sale: PosSale = {
   orderId: '0f9a2c51-7d3e-4b8a-9e61-3c5d7a2b8e40',
@@ -36,8 +36,13 @@ describe('storehubTransaction', () => {
       {productId: '602b358b83bf530006d0e546', quantity: 1, unitPrice: 9, subTotal: 9, total: 9, tax: 0, discount: 0},
       {productId: '683fe999d7c0ce00083fcfe5', quantity: 2, unitPrice: 19.5, subTotal: 39, total: 39, tax: 0, discount: 0},
     ]);
-    // StoreHub only knows Cash or CreditCard, so the real method and the pick-up time go in the comment.
-    expect(transaction.comment).toBe('Web order 0F9A2C, paid online (fpx), pick-up Tomorrow, 8am');
+    // Every web sale has one StoreHub payment method, so the real method and the pick-up time go in the
+    // comment, with the date written out: "Tomorrow" means nothing in a report read next month.
+    expect(transaction.comment).toBe('Web order 0F9A2C, paid online (fpx), pick-up Tue 24 Nov, 8am');
+  });
+
+  it('records under the payment method the shop names', () => {
+    expect(storehubTransaction(sale, {...shop, paymentMethod: 'Website'}).paymentMethod).toBe('Website');
   });
 
   it('refuses a dish with no StoreHub product rather than record a wrong sale', () => {

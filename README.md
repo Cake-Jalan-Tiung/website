@@ -22,7 +22,7 @@ Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or
 | Menu built for a phone: a category rail, one-tap + on every photo, a sheet for each dish | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
 | A bag pinned to the foot of the screen that survives closing the tab | Pause online ordering for today, or until resumed |
 | Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered | Mark dishes sold out until tomorrow |
-| Payment through [CHIP](https://www.chip-in.asia) (FPX, DuitNow QR, Touch 'n Go, GrabPay, cards) | Paid orders recorded as sales in StoreHub, cancelled on refund |
+| Payment through [CHIP](https://www.chip-in.asia) (FPX, DuitNow QR, Touch 'n Go, GrabPay, cards) | Paid orders recorded as sales in StoreHub, cancelled on refund, with each order's StoreHub state on the kitchen screen |
 | An order page that follows the order to Ready | An RM 1 staff test order to try real payments end to end |
 | Delivery still through Beep | Failure alerts by email |
 
@@ -46,7 +46,7 @@ flowchart LR
 - **Money is integer sen** end to end. The browser sends only dish ids and quantities; the server prices every cart from the catalogue.
 - **Order status only moves forward**, through one table in [`src/orders/model.ts`](src/orders/model.ts). Every change is a guarded `UPDATE … WHERE status IN (…)`, so a repeated or late payment event changes nothing.
 - **Payments are verified twice:** CHIP's RSA signature over the raw callback body, then the purchase read back from CHIP's API.
-- **A 5-minute cron** asks CHIP about orders still awaiting payment (a lost callback still reaches the kitchen; abandoned orders expire) and records sales in StoreHub.
+- **A 5-minute cron** asks CHIP about orders still awaiting payment (a lost callback still reaches the kitchen; abandoned orders expire), looks for refunds made in CHIP's dashboard, and records sales in StoreHub and cancels refunded ones. A sweep that meets a wrong token or StoreHub being down stops after one call, and the kitchen screen says how many sales StoreHub is missing.
 
 ## Stack
 

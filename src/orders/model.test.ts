@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
-import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, parseCustomer, priceCart, servingWindow} from './model';
+import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, isFinished, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
 import {isOpenSlot, pickupSlots} from './pickup';
 
@@ -34,6 +34,13 @@ describe('order status', () => {
     expect(canMove('expired', 'paid')).toBe(true);
     expect(canMove('cancelled', 'paid')).toBe(true);
     expect(canMove('refunded', 'paid')).toBe(false);
+  });
+
+  it('refunds a collected order, which the customer page still treats as finished', () => {
+    expect(canMove('collected', 'refunded')).toBe(true);
+    expect(isFinished('collected')).toBe(true);
+    expect(isFinished('refunded')).toBe(true);
+    expect(isFinished('ready')).toBe(false);
   });
 });
 

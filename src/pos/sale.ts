@@ -1,12 +1,12 @@
 // A paid web order as a sale in the shop's StoreHub POS, so web sales land in the same sales
-// report and stock counts as the counter's. Shape from StoreHub's REST API document (v1.5,
-// Add Transaction): amounts in ringgit, tax-exclusive, and the payment method limited to
-// Cash or CreditCard, so the real method goes in the comment.
+// report as the counter's. Shape from StoreHub's REST API document (v1.5, Add Transaction):
+// amounts in ringgit, tax-exclusive, and one payment method for every web sale, so the real
+// method and the pick-up time go in the comment.
 import {orderCode, type PricedLine} from '../orders/model';
-import {formatShopTime} from '../storefront/hours';
+import {formatShopDateTime} from '../storefront/hours';
 
 export type PosSale = {orderId: string; paidAt: string; pickupAt: string; paymentMethod: string; totalSen: number; items: readonly PricedLine[]};
-export type PosShop = {storeId: string; products: Readonly<Record<string, string>>; timeZone: string};
+export type PosShop = {storeId: string; paymentMethod: string; products: Readonly<Record<string, string>>; timeZone: string};
 
 export type StorehubItem = {productId: string; quantity: number; unitPrice: number; subTotal: number; total: number; tax: number; discount: number};
 export type StorehubTransaction = {
@@ -15,7 +15,7 @@ export type StorehubTransaction = {
   storeId: string;
   transactionType: 'Sale';
   transactionTime: string;
-  paymentMethod: 'CreditCard';
+  paymentMethod: string;
   total: number;
   subTotal: number;
   tax: number;
@@ -44,13 +44,13 @@ export function storehubTransaction(sale: PosSale, shop: PosShop): StorehubTrans
     storeId: shop.storeId,
     transactionType: 'Sale',
     transactionTime: sale.paidAt,
-    paymentMethod: 'CreditCard',
+    paymentMethod: shop.paymentMethod,
     total: ringgit(sale.totalSen),
     subTotal: ringgit(sale.totalSen),
     tax: 0,
     discount: 0,
     roundedAmount: 0,
-    comment: `Web order ${code}, paid online (${sale.paymentMethod}), pick-up ${formatShopTime(shop.timeZone, sale.pickupAt, new Date(sale.paidAt))}`,
+    comment: `Web order ${code}, paid online (${sale.paymentMethod}), pick-up ${formatShopDateTime(shop.timeZone, sale.pickupAt)}`,
     items,
   };
 }

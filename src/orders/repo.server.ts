@@ -3,6 +3,7 @@
 import {KITCHEN_STATUSES, ORDER_STATUSES, SOLD_STATUSES, TEST_DISH, allowedFrom, statusForPayment, type Customer, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import type {ConfirmedEvent} from '../payments/provider';
 import type {PosSale} from '../pos/sale';
+import type {PosBacklog} from '../pos/status';
 import type {ClosureRow} from './availability';
 
 export type OrderRow = {
@@ -13,12 +14,15 @@ export type OrderRow = {
   totalSen: number;
   purchaseId: string | null;
   createdAt: string;
+  paidAt: string | null;
+  /** When the sale reached the POS; null until it has. */
+  posRecordedAt: string | null;
   items: PricedLine[];
 };
 
 type OrderRecord = {
   id: string; status: string; pickup_at: string; customer_name: string; phone: string; email: string; note: string;
-  total_sen: number; purchase_id: string | null; created_at: string;
+  total_sen: number; purchase_id: string | null; created_at: string; paid_at: string | null; pos_recorded_at: string | null;
 };
 type ItemRecord = {order_id: string; dish_id: string; name: string; unit_sen: number; quantity: number};
 
@@ -33,11 +37,20 @@ function toRow(record: OrderRecord, items: ItemRecord[]): OrderRow {
     totalSen: record.total_sen,
     purchaseId: record.purchase_id,
     createdAt: record.created_at,
+    paidAt: record.paid_at,
+    posRecordedAt: record.pos_recorded_at,
     items: items.filter((item) => item.order_id === record.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
   };
 }
 
 const placeholders = (values: readonly unknown[]) => values.map(() => '?').join(', ');
+
+/** Sold orders that should be a POS sale and are not yet one. Staff test orders are real payments but not sales. */
+const UNRECORDED = `status IN (${placeholders(SOLD_STATUSES)}) AND paid_at IS NOT NULL AND pos_recorded_at IS NULL
+  AND id NOT IN (SELECT order_id FROM order_items WHERE dish_id = ?)`;
+const UNRECORDED_BINDS = [...SOLD_STATUSES, TEST_DISH.id];
+/** Refunded orders whose POS sale still stands. */
+const UNCANCELLED = `status = 'refunded' AND pos_recorded_at IS NOT NULL AND pos_cancelled_at IS NULL`;
 
 export function ordersRepo(db: D1Database, shopId: string) {
   const move = async (id: string, to: OrderStatus, now: Date): Promise<boolean> => {
@@ -123,10 +136,8 @@ export function ordersRepo(db: D1Database, shopId: string) {
 
     /** Sold orders not yet recorded in the POS, oldest payment first. */
     async posUnrecorded(limit: number): Promise<PosSale[]> {
-      // Staff test orders are real payments but not sales.
-      const where = `shop_id = ? AND status IN (${placeholders(SOLD_STATUSES)}) AND paid_at IS NOT NULL AND pos_recorded_at IS NULL
-        AND id NOT IN (SELECT order_id FROM order_items WHERE dish_id = ?)`;
-      const binds = [shopId, ...SOLD_STATUSES, TEST_DISH.id];
+      const where = `shop_id = ? AND ${UNRECORDED}`;
+      const binds = [shopId, ...UNRECORDED_BINDS];
       const [orders, items] = await Promise.all([
         db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen FROM orders WHERE ${where} ORDER BY paid_at LIMIT ?`).bind(...binds, limit)
           .all<{id: string; paid_at: string; pickup_at: string; payment_method: string; total_sen: number}>(),
@@ -144,16 +155,44 @@ export function ordersRepo(db: D1Database, shopId: string) {
 
     /** Refunded orders whose POS sale has not been cancelled yet. */
     async posUncancelled(limit: number): Promise<string[]> {
-      const rows = await db
-        .prepare(`SELECT id FROM orders WHERE shop_id = ? AND status = 'refunded' AND pos_recorded_at IS NOT NULL AND pos_cancelled_at IS NULL ORDER BY updated_at LIMIT ?`)
-        .bind(shopId, limit)
-        .all<{id: string}>();
+      const rows = await db.prepare(`SELECT id FROM orders WHERE shop_id = ? AND ${UNCANCELLED} ORDER BY updated_at LIMIT ?`).bind(shopId, limit).all<{id: string}>();
       return rows.results.map((row) => row.id);
+    },
+
+    /** What the POS should have by `stuckBefore` and does not, across every day, for the kitchen board. */
+    async posBacklog(stuckBefore: Date): Promise<PosBacklog> {
+      const before = stuckBefore.toISOString();
+      const [unrecorded, uncancelled] = await Promise.all([
+        db.prepare(`SELECT COUNT(*) AS n, MIN(paid_at) AS oldest FROM orders WHERE shop_id = ? AND ${UNRECORDED} AND paid_at < ?`)
+          .bind(shopId, ...UNRECORDED_BINDS, before).first<{n: number; oldest: string | null}>(),
+        db.prepare(`SELECT COUNT(*) AS n FROM orders WHERE shop_id = ? AND ${UNCANCELLED} AND updated_at < ?`).bind(shopId, before).first<{n: number}>(),
+      ]);
+      return {unrecorded: unrecorded?.n ?? 0, oldestPaidAt: unrecorded?.oldest ?? null, uncancelled: uncancelled?.n ?? 0};
     },
 
     async markPos(id: string, step: 'recorded' | 'cancelled', at: Date) {
       const column = step === 'recorded' ? 'pos_recorded_at' : 'pos_cancelled_at';
       await db.prepare(`UPDATE orders SET ${column} = ? WHERE id = ? AND shop_id = ?`).bind(at.toISOString(), id, shopId).run();
+    },
+
+    /**
+     * Sold orders paid since `paidSince` that the provider has not been asked about since
+     * `checkedBefore`, never-asked first: the refund sweep's next batch.
+     */
+    async refundCheckDue(paidSince: Date, checkedBefore: Date, limit: number): Promise<{id: string; purchaseId: string}[]> {
+      const rows = await db
+        .prepare(
+          `SELECT id, purchase_id FROM orders WHERE shop_id = ? AND status IN (${placeholders(SOLD_STATUSES)}) AND purchase_id IS NOT NULL
+             AND paid_at >= ? AND (refund_checked_at IS NULL OR refund_checked_at < ?)
+           ORDER BY refund_checked_at IS NOT NULL, refund_checked_at, paid_at LIMIT ?`,
+        )
+        .bind(shopId, ...SOLD_STATUSES, paidSince.toISOString(), checkedBefore.toISOString(), limit)
+        .all<{id: string; purchase_id: string}>();
+      return rows.results.map((row) => ({id: row.id, purchaseId: row.purchase_id}));
+    },
+
+    async markRefundChecked(id: string, at: Date) {
+      await db.prepare('UPDATE orders SET refund_checked_at = ? WHERE id = ? AND shop_id = ?').bind(at.toISOString(), id, shopId).run();
     },
   };
 }

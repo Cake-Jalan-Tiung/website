@@ -10,7 +10,8 @@ import {Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {formatShopTime} from '../storefront/hours';
 import {Sections} from '../storefront/sections';
-import {advanceOrder, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffOrder} from './functions';
+import {advanceOrder, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffBoardData, type StaffOrder} from './functions';
+import type {PosBacklog, PosState} from '../pos/status';
 import {showAvailability, useAvailability} from './availability-store';
 import type {CloseFor} from './availability';
 import {KITCHEN_COLUMNS, TEST_DISH, kitchenNext, formatRM} from './model';
@@ -35,6 +36,40 @@ function ring(context: AudioContext) {
     tone.start(context.currentTime + start);
     tone.stop(context.currentTime + start + 0.32);
   });
+}
+
+/** What the counter needs to know about each sale in StoreHub: mostly that it is there, so it is not rung up again. */
+const POS_LINE: Record<PosState, string> = {
+  recorded: 'In StoreHub',
+  sending: 'Going into StoreHub',
+  stuck: 'Not in StoreHub yet',
+  'not-a-sale': 'Test order, not sent to StoreHub',
+};
+
+const sales = (n: number) => (n === 1 ? '1 web sale' : `${n} web sales`);
+
+/** Shown only when StoreHub is missing something, so the counter neither worries nor rings sales up twice. */
+function PosWarnings({backlog}: {backlog: PosBacklog}) {
+  const tell = 'The site keeps trying every 5 minutes. If this lasts, tell whoever looks after the website.';
+  const oldest = backlog.oldestPaidAt ? `Oldest paid ${formatShopTime(storefront.timeZone, backlog.oldestPaidAt)}. ` : '';
+  return (
+    <>
+      {backlog.unrecorded > 0 ? (
+        <Banner
+          status="warning"
+          title={`${sales(backlog.unrecorded)} not in StoreHub yet`}
+          description={`${oldest}Don’t ring web orders up at the counter: they go into StoreHub by themselves once it accepts them. ${tell}`}
+        />
+      ) : null}
+      {backlog.uncancelled > 0 ? (
+        <Banner
+          status="warning"
+          title={`${sales(backlog.uncancelled)} refunded but still counted in StoreHub`}
+          description={`StoreHub’s sales totals include the refunded money until the site cancels the sale. ${tell}`}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function minutesUntil(iso: string, now: number) {
@@ -70,9 +105,14 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
         </span>
       ) : null}
       <Row justify="between" align="center" gap="sm">
-        <a href={`tel:${order.phone}`}>
-          <Type role="caption" ink="secondary">{order.phone} · {formatRM(order.totalSen)} paid</Type>
-        </a>
+        <Stack gap="none">
+          <a href={`tel:${order.phone}`}>
+            <Type role="caption" ink="secondary">{order.phone} · {formatRM(order.totalSen)} paid</Type>
+          </a>
+          {order.pos ? (
+            <Type role="caption" ink="secondary" className={order.pos === 'stuck' ? s.late : undefined}>{POS_LINE[order.pos]}</Type>
+          ) : null}
+        </Stack>
         {next ? (
           <Button
             variant={isNewStatus(order) ? 'primary' : 'secondary'}
@@ -164,31 +204,33 @@ function SignIn({onSignedIn}: {onSignedIn: () => void}) {
   );
 }
 
-export function StaffBoard({initial}: {initial: StaffOrder[] | null}) {
-  const [orders, setOrders] = useState(initial);
+export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
+  const [board, setBoard] = useState(initial);
+  const orders = board?.orders ?? [];
   const [sound, setSound] = useState<AudioContext | null>(null);
   // New orders already on the board when it opened (or when staff signed in) are not
   // announced or highlighted; every later one is.
-  const onOpen = useRef(new Set((initial ?? []).filter(isNewStatus).map((o) => o.id)));
+  const onOpen = useRef(new Set((initial?.orders ?? []).filter(isNewStatus).map((o) => o.id)));
   const rung = useRef(new Set(onOpen.current));
   const soundRef = useRef(sound);
   soundRef.current = sound;
 
   const refresh = async ({opening = false} = {}) => {
     const next = await getStaffBoard();
+    const nextOrders = next?.orders ?? [];
     if (opening) {
-      for (const order of (next ?? []).filter(isNewStatus)) {
+      for (const order of nextOrders.filter(isNewStatus)) {
         onOpen.current.add(order.id);
         rung.current.add(order.id);
       }
     }
-    setOrders(next);
-    const arrived = (next ?? []).filter((o) => isNewStatus(o) && !rung.current.has(o.id));
+    setBoard(next);
+    const arrived = nextOrders.filter((o) => isNewStatus(o) && !rung.current.has(o.id));
     arrived.forEach((o) => rung.current.add(o.id));
     if (arrived.length > 0 && soundRef.current) ring(soundRef.current);
   };
 
-  const signedIn = orders !== null;
+  const signedIn = board !== null;
   useEffect(() => {
     if (!signedIn) return;
     const timer = window.setInterval(() => void refresh(), POLL_MS);
@@ -197,12 +239,12 @@ export function StaffBoard({initial}: {initial: StaffOrder[] | null}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
-  const waiting = (orders ?? []).filter(isNewStatus).length;
+  const waiting = orders.filter(isNewStatus).length;
   useEffect(() => {
     document.title = waiting > 0 ? `(${waiting}) New orders — Kitchen` : 'Kitchen — Cake Jalan Tiung';
   }, [waiting]);
 
-  if (orders === null) {
+  if (board === null) {
     return (
       <Sections>
         <SignIn onSignedIn={() => void refresh({opening: true})} />
@@ -228,10 +270,12 @@ export function StaffBoard({initial}: {initial: StaffOrder[] | null}) {
               label={`Test order (${formatRM(Math.round(TEST_DISH.price * 100))})`}
               onClick={() => { bag.clear(); bag.set(TEST_DISH.id, 1); window.location.assign('/checkout'); }}
             />
-            <Button variant="ghost" label="Sign out" clickAction={async () => { await staffLogout(); setOrders(null); }} />
+            <Button variant="ghost" label="Sign out" clickAction={async () => { await staffLogout(); setBoard(null); }} />
           </Row>
         </Row>
+        {board.pos ? <Type role="body" ink="secondary">Paid web orders go into StoreHub as sales by themselves. Don’t ring them up at the counter.</Type> : null}
         {!sound ? <Banner status="info" title="Tap Turn on sound so new orders ring. Browsers keep pages silent until someone taps." /> : null}
+        {board.pos ? <PosWarnings backlog={board.pos} /> : null}
         <Columns count={3} gap="md" align="start">
           {KITCHEN_COLUMNS.map((column) => {
             const tickets = orders.filter((o) => o.status === column.status);

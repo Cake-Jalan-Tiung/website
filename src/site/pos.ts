@@ -6,6 +6,13 @@ export const storehub = {
   username: 'cakejalantiung',
   /** Cake Jalan Tiung | Seksyen 4 Shah Alam, the pick-up counter. */
   storeId: '560ce27f0ce34105ab775d52',
+  /**
+   * The payment method web sales are recorded under. StoreHub's API document allows only Cash or
+   * CreditCard; the counter's own sales also carry custom options (MAYBANK QR, Online Bank
+   * Transfer), so one named for the website may be accepted once it is added in StoreHub's back
+   * office. Untried: change it here only after one sale under the new name has been seen in StoreHub.
+   */
+  paymentMethod: 'CreditCard',
   products: {
     'indulgent-iceberg-cheesecake': '697f09181a52e000070f25fb',
     'london-to-shah-alam': '6a8115df50c22800078fc78d',

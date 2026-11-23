@@ -14,6 +14,7 @@ import {isOpenSlot, pickupSlots, type Slot} from './pickup';
 import {closuresRepo, ordersRepo, staffAttempts, type OrderRow} from './repo.server';
 import {ORDERS_SUBJECT, assertAvailable, availabilityFrom, closureEnds, dishSubject, parseCloseFor, type Availability} from './availability';
 import {STAFF_COOKIE, STAFF_SESSION_DAYS, isStaffToken, issueStaffToken, sameSecret} from './staff-session.server';
+import {posStuckBefore, posState, posSyncOn, type PosBacklog, type PosState} from '../pos/status';
 
 const repo = () => ordersRepo(env.DB, env.SHOP_ID);
 const closures = () => closuresRepo(env.DB, env.SHOP_ID);
@@ -234,7 +235,10 @@ export const staffLogout = createServerFn({method: 'POST'}).handler(async () => 
   return {ok: true};
 });
 
-export type StaffOrder = PublicOrder & {name: string; phone: string; note: string};
+/** `pos` is where the sale stands in StoreHub; null on a deploy that does not send sales there. */
+export type StaffOrder = PublicOrder & {name: string; phone: string; note: string; pos: PosState | null};
+/** `pos` counts what StoreHub is missing across every day, not only the board's; null when sales are not sent there. */
+export type StaffBoardData = {orders: StaffOrder[]; pos: PosBacklog | null};
 
 /**
  * A refund made in the provider's dashboard sends no callback, so orders on the board are
@@ -264,12 +268,28 @@ async function withoutRefunded(board: OrderRow[], now: Date): Promise<OrderRow[]
   return kept.filter((order): order is OrderRow => order !== null);
 }
 
-/** The kitchen's board: orders to make, soonest pick-up first, and those collected today. Null when signed out. */
-export const getStaffBoard = createServerFn({method: 'GET'}).handler(async (): Promise<StaffOrder[] | null> => {
+/**
+ * The kitchen's board: orders to make, soonest pick-up first, those collected today, and how
+ * web sales stand in StoreHub. Null when signed out.
+ */
+export const getStaffBoard = createServerFn({method: 'GET'}).handler(async (): Promise<StaffBoardData | null> => {
   if (!(await isStaff())) return null;
   const now = new Date();
-  const orders = await withoutRefunded(await repo().kitchen(startOfShopDay(storefront.timeZone, now)), now);
-  return orders.map((order) => ({...toPublic(order), name: order.customer.name, phone: order.customer.phone, note: order.customer.note}));
+  const syncOn = posSyncOn(env.PAYMENTS);
+  const [board, backlog] = await Promise.all([
+    repo().kitchen(startOfShopDay(storefront.timeZone, now)).then((orders) => withoutRefunded(orders, now)),
+    syncOn ? repo().posBacklog(posStuckBefore(now)) : null,
+  ]);
+  return {
+    orders: board.map((order) => ({
+      ...toPublic(order),
+      name: order.customer.name,
+      phone: order.customer.phone,
+      note: order.customer.note,
+      pos: syncOn ? posState(order, now) : null,
+    })),
+    pos: backlog,
+  };
 });
 
 export const advanceOrder = createServerFn({method: 'POST'})

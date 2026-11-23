@@ -70,18 +70,29 @@ export function addDays(date: ShopDate, offset: number): ShopDate {
 
 export const dateKey = (date: ShopDate) => `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
 
+/** "Fri 27 Nov", whatever today is. */
+function calendarLabel(date: ShopDate) {
+  const weekday = (new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay() + 6) % 7;
+  return `${WEEKDAYS[weekday]} ${date.day} ${MONTHS[date.month - 1]}`;
+}
+
 /** "Today", "Tomorrow", or "Fri 27 Nov", relative to the shop's today. */
 export function dayLabel(timeZone: string, date: ShopDate, now: Date = new Date()) {
   const today = shopClock(timeZone, now);
   const key = dateKey(date);
   if (key === dateKey(today)) return 'Today';
   if (key === dateKey(addDays(today, 1))) return 'Tomorrow';
-  const weekday = (new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay() + 6) % 7;
-  return `${WEEKDAYS[weekday]} ${date.day} ${MONTHS[date.month - 1]}`;
+  return calendarLabel(date);
 }
 
 /** A moment on the shop's clock: "Today, 2:15pm", "Fri 27 Nov, 2:15pm". */
 export function formatShopTime(timeZone: string, iso: string, now: Date = new Date()) {
   const at = shopClock(timeZone, new Date(iso));
   return `${dayLabel(timeZone, at, now)}, ${formatMinutes(at.minutes)}`;
+}
+
+/** A moment on the shop's clock with its date always written out ("Fri 27 Nov, 2:15pm"), for records read long after. */
+export function formatShopDateTime(timeZone: string, iso: string) {
+  const at = shopClock(timeZone, new Date(iso));
+  return `${calendarLabel(at)}, ${formatMinutes(at.minutes)}`;
 }

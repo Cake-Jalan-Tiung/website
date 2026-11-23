@@ -98,7 +98,8 @@ const STATUSES = {
     customer: {title: 'Ready to collect', line: 'Come to the counter and give your order code.', step: 'Ready'},
     kitchen: {column: 'Ready to collect', next: {to: 'collected', label: 'Collected'}},
   },
-  collected: {moves: [], customer: {title: 'Collected', line: 'Enjoy. Thank you for ordering.', step: 'Collected'}},
+  // A collected order can still be refunded, for a complaint after the customer has left.
+  collected: {moves: ['refunded'], customer: {title: 'Collected', line: 'Enjoy. Thank you for ordering.', step: 'Collected'}},
   // Money can still arrive after an order expired or a payment attempt failed (the customer
   // retried, or a callback was late); money that arrives is always honoured.
   expired: {moves: ['paid'], customer: {title: 'Payment not received', line: 'If you paid, keep this page open: it updates by itself once the payment arrives. If not, nothing was taken.'}},
@@ -119,7 +120,8 @@ const info = (status: OrderStatus): StatusInfo => STATUSES[status];
 export const canMove = (from: OrderStatus, to: OrderStatus) => info(from).moves.includes(to);
 export const allowedFrom = (to: OrderStatus) => ORDER_STATUSES.filter((from) => canMove(from, to));
 export const customerCopy = (status: OrderStatus) => info(status).customer;
-export const isFinished = (status: OrderStatus) => info(status).moves.length === 0;
+/** Nothing more is expected: the customer has the order, or the money went back. A refund can still follow collection. */
+export const isFinished = (status: OrderStatus) => status === 'collected' || status === 'refunded';
 /** Expired or cancelled: nothing is expected to happen, though a late payment still could. */
 export const isDormant = (status: OrderStatus) => status === 'expired' || status === 'cancelled';
 
