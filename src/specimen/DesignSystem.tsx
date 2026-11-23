@@ -35,6 +35,8 @@ import {color, layout, minSize, tracking, typeScale, type ColorName, type TypeRo
 import {Type} from '../system/Type';
 import {Closing} from '../site/Closing';
 import {boardPlace, handDrawn, labels, menu, promise, signOff, soldOutLine} from '../site/content';
+import {printing, printLines} from '../system/print';
+import {Applications, pieceCount} from './Applications';
 import s from './specimen.module.css';
 
 const custody: readonly RuleEntry[] = [
@@ -106,6 +108,7 @@ const chapters = {
   type: {title: 'Type', line: 'Jost is the support face. Six steps, two weights.', meta: Object.values(typeScale).map((step) => step.size).join(' · ')},
   language: {title: 'Two languages', line: 'Malay first, English second. Never mixed inside a phrase.', meta: 'Three forms'},
   menu: {title: 'Menu board', line: 'Ink ground, cream names and prices, warm grey English, reversed hairlines.', meta: 'Mock up 03'},
+  applications: {title: 'Applications', line: 'The same rules on what the shop hands over: the box, the post, the receipt.', meta: `${pieceCount} pieces · composed here, not in Paper`},
   astryx: {title: 'Components', line: "Astryx's own components wearing the cjt theme. Colour fields are Field, not Card.", meta: '174 available'},
 } as const;
 type ChapterId = keyof typeof chapters;
@@ -296,11 +299,11 @@ export function DesignSystem() {
 
         <Chapter id="colour">
           <Columns count={5} narrow={2}>
-            <Swatch name="Cocoa" colour="ink" />
-            <Swatch name="Blueberry" colour="blue" />
-            <Swatch name="Buttercream" colour="cream-400" />
-            <Swatch name="Strawberry" colour="pink" />
-            <Swatch name="Sugar" colour="paper" />
+            <Swatch name="Cocoa" colour="ink" print={printLines(printing.ink)} />
+            <Swatch name="Blueberry" colour="blue" print={printLines(printing.blue)} />
+            <Swatch name="Buttercream" colour="cream-400" print={printLines(printing['cream-400'])} />
+            <Swatch name="Strawberry" colour="pink" print={printLines(printing.pink)} />
+            <Swatch name="Sugar" colour="paper" print={printLines(printing.paper)} />
           </Columns>
         </Chapter>
       </Sheet>
@@ -399,6 +402,10 @@ export function DesignSystem() {
       </Band>
 
       <Sheet>
+        <Chapter id="applications">
+          <Applications />
+        </Chapter>
+
         <Chapter id="astryx">
           <Row>
             <Button variant="primary" label={labels.orderNow.bm} />

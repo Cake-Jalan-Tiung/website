@@ -5,3 +5,4 @@ themes/cjt/*.png
 .pnpm-store
 *.tsbuildinfo
 themes/cjt/sheet*.html
+exports

@@ -1,8 +1,8 @@
 import type {ComponentType, CSSProperties, ReactNode} from 'react';
-import {BurungTiung, BurungTiungIcon, BurungTiungMono, BurungTiungReversed, PrimaryLockup, type MarkEntry, type MarkProps} from '../marks/marks.generated';
+import {BurungTiung, BurungTiungIcon, BurungTiungMono, BurungTiungReversed, PrimaryLockup, StackedLockup, type MarkEntry, type MarkProps} from '../marks/marks.generated';
 import {Field, useGround} from './Field';
-import {wordmarkInk, type Flavour, type Ground, type Staged, type TextInk} from './model';
-import {color, colorVar, minSize, type ColorName} from './tokens';
+import {legalText, wordmarkInk, type Flavour, type Ground, type Staged, type TextInk} from './model';
+import {color, colorVar, minSize, type ColorName, type space} from './tokens';
 import {Type, type TypeRole} from './Type';
 import c from './components.module.css';
 import t from './type.module.css';
@@ -127,12 +127,12 @@ export function VisuallyHidden({children}: {children: ReactNode}) {
   return <span className={c.visuallyHidden}>{children}</span>;
 }
 
-/** A bare numeral, as on the menu board. Screen readers hear the currency. */
+/** A bare numeral, as on the menu board: whole ringgit alone, sen to two places. Screen readers hear the currency. */
 export function Price({amount, ink, role = 'subhead', className}: {amount: number; ink?: TextInk; role?: TypeRole; className?: string}) {
   return (
     <Type role={role} ink={ink} className={cx(c.price, className)}>
       <VisuallyHidden>RM </VisuallyHidden>
-      {amount}
+      {Number.isInteger(amount) ? amount : amount.toFixed(2)}
     </Type>
   );
 }
@@ -155,10 +155,15 @@ export function Rule({tone = 'default'}: {tone?: 'default' | 'marker'}) {
 /**
  * Grammar sheet 04: Jost Medium, capitals, 0.2em. The fallback for the drawn lockup.
  * It is identity, not text, so it takes its colour from the ground, not from an ink prop.
+ * `mono` is for print that has only ink, such as a thermal receipt: like the single-colour
+ * bird, it is ink wherever it is put.
  */
-export function TypesetWordmark({role = 'caption'}: {role?: Exclude<TypeRole, 'display'>}) {
+export function TypesetWordmark({role = 'caption', mono = false}: {role?: Exclude<TypeRole, 'display'>; mono?: boolean}) {
+  const ground = useGround();
+  const legal: readonly TextInk[] = legalText[ground];
+  if (import.meta.env.DEV && mono && !legal.includes('ink')) console.error(`cjt: the mono wordmark is ink, which is not legal on ${ground}.`);
   return (
-    <span className={cx(t[role], t.wordmark, t[wordmarkInk(useGround())])} data-cjt="wordmark">
+    <span className={cx(t[role], t.wordmark, t[mono ? 'ink' : wordmarkInk(ground)])} data-cjt="wordmark">
       Cake Jalan Tiung
     </span>
   );
@@ -175,14 +180,16 @@ function reversedSlots(ground: Ground, lines: ColorName): CSSProperties | undefi
 }
 
 /**
- * The primary lockup at a rendered width. Grammar sheet 04: below 180px the drawn
- * letters stop reading, so the typeset wordmark stands in. Never retyped above it.
- * On ink and on the cobalt awning it is drawn in cream, like the wordmark.
+ * The lockup at a rendered width. Grammar sheet 04: below 180px the drawn letters stop
+ * reading, so the typeset wordmark stands in. Never retyped above it. `stacked` is the
+ * tall lockup, for when we need to go tall. On ink and on the cobalt awning it is drawn
+ * in cream, like the wordmark.
  */
-export function Logo({width}: {width: number}) {
+export function Logo({width, stacked = false}: {width: number; stacked?: boolean}) {
   const ground = useGround();
   if (width < minSize['wordmark-drawn']) return <TypesetWordmark />;
-  return <PrimaryLockup width={width} className={c.logo} style={reversedSlots(ground, 'cream-400')} />;
+  const Lockup = stacked ? StackedLockup : PrimaryLockup;
+  return <Lockup width={width} className={c.logo} style={reversedSlots(ground, 'cream-400')} />;
 }
 
 /**
@@ -263,6 +270,55 @@ export function MarkTile({entry, height, padding}: {entry: MarkEntry; height?: n
       }
       label={entry.label}
       caption={entry.note}
+    />
+  );
+}
+
+/* ---------- Artboards ---------- */
+
+type Space = Exclude<keyof typeof space, '3xl'> | 'none';
+const inset = (step: Space) => (step === 'none' ? '0' : `var(--cjt-space-${step})`);
+
+export type ArtboardProps = {
+  ground: Ground;
+  /** The drawn size in px. */
+  width: number;
+  height: number;
+  /** Space around the content; a pair is block, then inline. */
+  padding?: Space | readonly [Space, Space];
+  /** Paper is outlined on the page; an export has no page, so it turns this off. */
+  outlined?: boolean;
+  children: ReactNode;
+} & {[data: `data-${string}`]: string};
+
+/**
+ * A piece drawn at a fixed size: a box lid, a post, a receipt. It clips at its edge like
+ * the printed thing, and nothing inside answers to the viewport, so it is the same in a
+ * tile and in an export. Its one child fills it.
+ */
+export function Artboard({ground, width, height, padding = 'md', outlined, children, ...data}: ArtboardProps) {
+  const [block, inline] = typeof padding === 'string' ? [padding, padding] : padding;
+  const size = {width, height, padding: `${inset(block)} ${inset(inline)}`, '--art-w': `${width}px`, '--art-h': `${height}px`} as CSSProperties;
+  return (
+    <Field {...data} colour={ground} outlined={outlined} className={c.artboard} style={size}>
+      {children}
+    </Field>
+  );
+}
+
+/** An artboard on a chalk stage, shrunk to fit it and never grown past its drawn size, with its caption. */
+export function ArtboardTile({label, caption, stage = 440, ...artboard}: ArtboardProps & {label: string; caption?: ReactNode; stage?: number}) {
+  return (
+    <Captioned
+      stage={
+        <Frame ground="chalk" height={stage}>
+          <div className={c.fit}>
+            <Artboard {...artboard} />
+          </div>
+        </Frame>
+      }
+      label={label}
+      caption={caption}
     />
   );
 }
@@ -368,14 +424,19 @@ export function ColourRoles({roles}: {roles: readonly ColourRole[]}) {
   );
 }
 
-/** Concept "Our colours": a chip, its name, its value. */
-export function Swatch({name, colour}: {name: string; colour: ColorName}) {
+/** Concept "Our colours": a chip, its name, its value, and how it prints. */
+export function Swatch({name, colour, print = []}: {name: string; colour: ColorName; print?: readonly string[]}) {
   return (
     <figure className={c.swatch} data-cjt="swatch">
       <Field as="span" aria-hidden colour={colour} className={c.swatchChip} data-cjt="swatch-chip" />
       <figcaption className={c.swatchMeta}>
         <Label ink="secondary">{name}</Label>
         <Type role="body">{color[colour]}</Type>
+        {print.map((line) => (
+          <Type key={line} role="caption" ink="secondary">
+            {line}
+          </Type>
+        ))}
       </figcaption>
     </figure>
   );

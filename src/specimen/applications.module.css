@@ -1,0 +1,15 @@
+/* The tote: one-inch webbing straps, a 280mm drop, over the 380 × 420mm bag. The piece's own measurements. */
+.straps {
+  flex: 0 0 280mm;
+  width: 50%;
+  box-sizing: border-box;
+  border: 25mm solid var(--cjt-color-cream-400);
+  border-bottom: 0;
+}
+.bag {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+}

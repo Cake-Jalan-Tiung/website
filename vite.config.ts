@@ -7,6 +7,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         site: 'index.html',
+        menu: 'menu.html',
         designSystem: 'design-system.html',
       },
     },

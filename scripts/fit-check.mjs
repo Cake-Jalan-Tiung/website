@@ -1,4 +1,4 @@
-// Loads the site, the specimen and the worst-case page at six widths and fails if
+// Loads the site, its menu, the specimen and the worst-case page at six widths and fails if
 // anything spills: an element past the viewport edge, content wider than its box, or
 // content cut off by a box that clips.
 //
@@ -7,7 +7,7 @@
 import {spawn} from 'node:child_process';
 import {chromium} from 'playwright-core';
 
-const PAGES = ['/', '/design-system.html', '/stress.html'];
+const PAGES = ['/', '/menu.html', '/design-system.html', '/stress.html'];
 const WIDTHS = [320, 390, 768, 900, 1024, 1440];
 
 async function withServer(run) {

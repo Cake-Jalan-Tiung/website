@@ -57,6 +57,27 @@
 .tile { display: flex; flex-direction: column; gap: 18px; min-width: 0; margin: 0; }
 .tileCaption { display: flex; flex-direction: column; gap: 5px; }
 
+/* Artboard: a piece at its drawn size. What elsewhere follows the viewport (the display
+   step, a stage's height) is held at full value inside it. */
+.artboard {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  --cjt-display-size: var(--cjt-text-display);
+}
+.artboard > * { flex: 1 1 auto; }
+.artboard .stage { --h: var(--stage-h); --p: var(--stage-pad); }
+/* In a tile it shrinks to the stage, centred, and never grows. tan(atan2(a, b)) is a / b as a number. */
+.fit { position: relative; container-type: size; width: 100%; height: var(--cjt-stage-art); }
+.fit > .artboard {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%) scale(min(1, tan(atan2(100cqw, var(--art-w))), tan(atan2(100cqh, var(--art-h)))));
+}
+
 /* RuleList (G02 Custody rows: 16 block padding; status 110, name 300) */
 .ruleRow { composes: row; align-items: baseline; padding-block: var(--cjt-space-sm); }
 .ruleStatus { flex: 0 0 110px; }

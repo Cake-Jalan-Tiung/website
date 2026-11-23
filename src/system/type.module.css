@@ -48,9 +48,10 @@
   letter-spacing: var(--cjt-tracking-head);
   text-transform: var(--cjt-case-head);
 }
-/* 68/70 from 1440 wide; scales down to Astryx's phone display size (45px), keeping the +2px leading. */
+/* 68/70 from 1440 wide; scales down to Astryx's phone display size (45px), keeping the +2px leading.
+   A surface drawn at a fixed size (Artboard) sets --cjt-display-size, so its display ignores the viewport. */
 .display {
-  --display-size: clamp(2.8125rem, 4.73vw, var(--cjt-text-display));
+  --display-size: var(--cjt-display-size, clamp(2.8125rem, 4.73vw, var(--cjt-text-display)));
   font-size: var(--display-size);
   line-height: calc(var(--display-size) + var(--cjt-leading-display) - var(--cjt-text-display));
   font-weight: var(--cjt-weight-display);

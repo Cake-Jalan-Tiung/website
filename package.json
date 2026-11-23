@@ -15,6 +15,7 @@
     "marks": "node scripts/build-marks.mjs",
     "spec": "node scripts/spec-check.mjs",
     "fit": "node scripts/fit-check.mjs",
+    "export": "node scripts/export.mjs",
     "test": "vitest run"
   },
   "dependencies": {

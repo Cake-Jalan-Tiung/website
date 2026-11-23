@@ -1,0 +1,132 @@
+/* Storefront metrics. Values are tokens only; these are our compositions, not Paper's. A shop
+   page is denser than the brand book: one slim header, sections a 64px step apart. */
+
+:root { --store-header-h: 64px; }
+html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-space-md)); }
+
+/* The passing line over the header: one label tall, a small step above and below. */
+.ticker { padding-block: var(--cjt-space-xs); }
+/* The marquee's keyboard pause button, held to the ticker's one line so it is not clipped. */
+.ticker button { inset-block: 0; padding-block: 0; }
+
+/* The header: sticky, one row, a hairline under it. */
+.header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--cjt-color-rule); }
+.headerInner {
+  display: flex;
+  align-items: center;
+  gap: var(--cjt-space-lg);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  height: var(--store-header-h);
+  margin-inline: auto;
+  padding-inline: var(--cjt-space-gutter);
+}
+.brand { display: flex; flex-shrink: 0; align-items: center; gap: var(--cjt-space-xs); color: inherit; text-decoration: none; }
+.brand:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 4px; }
+.nav {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: safe center;
+  gap: var(--cjt-space-md);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+/* The hero's line and lede, held to a readable measure. */
+.headline { max-width: 12ch; }
+.lede { max-width: var(--cjt-measure); }
+
+/* Sections between the hero and the visit band. */
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cjt-space-xl);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding: var(--cjt-space-xl) var(--cjt-space-gutter);
+}
+
+/* Facts: four in a row, a hairline over each. */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--cjt-space-md); margin: 0; padding: 0; list-style: none; }
+.fact { display: flex; flex-direction: column; gap: 4px; padding-top: var(--cjt-space-sm); border-top: 1px solid var(--cjt-color-ink); }
+.factTitle { font-weight: var(--cjt-weight-medium); }
+
+/* Media: a box of fixed proportions. A photo fills it, cropped; a stage fills it too, its
+   drawing held to the box's real height (100cqh) instead of the stage's drawn height. */
+.media { display: block; container-type: size; width: 100%; overflow: hidden; }
+.media > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.media > [class] { --h: 100cqh; height: 100%; min-height: 0; box-sizing: border-box; }
+.dishName { font-weight: var(--cjt-weight-medium); }
+
+/* A card: media, then name and price on one baseline, the description, the action. */
+.card { display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; margin: 0; }
+.card > :last-child:is(a, button) { align-self: flex-start; }
+.cardHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--cjt-space-sm); }
+/* The price or the count never shrinks; when the row runs out, it drops under the name. */
+.cardHead > :last-child { flex-shrink: 0; }
+
+/* A whole tile that is one link: no underline on the block, a clear focus ring, the name underlines under the pointer. */
+.tileLink { color: inherit; text-decoration: none; }
+.tileLink:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: var(--cjt-space-xs); }
+.tileLink:hover .tileName { text-decoration: underline; text-underline-offset: 0.2em; }
+
+/* Two lines of a description on a card; the menu prints it in full. */
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* The menu: hairline rows in two columns, name and description beside the price. */
+.menuList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--cjt-space-xl);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.menuRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cjt-space-md);
+  padding-block: var(--cjt-space-md);
+  border-bottom: 1px solid var(--cjt-color-rule);
+}
+.menuRow > :last-child { flex-shrink: 0; margin-inline-start: auto; }
+.menuText { display: flex; flex-direction: column; gap: var(--cjt-space-xs); min-width: 0; }
+.thumb { flex-shrink: 0; width: 72px; height: 72px; object-fit: cover; }
+
+/* Hours by day: day and hours on one line, a hairline under each, today in medium. */
+.week { margin: 0; max-width: var(--cjt-measure); }
+.weekRow { display: flex; justify-content: space-between; gap: var(--cjt-space-sm); padding-block: 6px; border-bottom: 1px solid color-mix(in srgb, var(--cjt-color-ink) 15%, transparent); }
+.weekRow dd { margin: 0; }
+.weekRow[data-today] * { font-weight: var(--cjt-weight-medium); }
+
+/* A plain link on ink: the text keeps its legal ink, the underline comes on hover and focus. */
+.plainLink { color: inherit; text-decoration: none; }
+.plainLink:hover,
+.plainLink:focus-visible { text-decoration: underline; text-underline-offset: 0.2em; }
+.plainLink:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* The legal line at the foot: a reversed hairline over it. */
+.legal { margin: 0; padding-top: var(--cjt-space-md); border-top: 1px solid var(--cjt-color-rule-reversed); }
+
+@media (max-width: 1199px) {
+  .headerInner, .sections { padding-inline: var(--cjt-space-lg); }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 899px) {
+  .headerInner { gap: var(--cjt-space-md); padding-inline: var(--cjt-space-sm); }
+  .sections { padding: var(--cjt-space-lg) var(--cjt-space-sm); }
+  .menuList { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* On a phone the header keeps the bird, the menu and Order now. */
+@media (max-width: 599px) {
+  .nav > :not(:first-child) { display: none; }
+  .nav { justify-content: flex-end; }
+}
+@media (max-width: 399px) {
+  .brandName { display: none; }
+}

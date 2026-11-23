@@ -131,8 +131,8 @@ export function Row({gap = 'sm', align = 'center', justify, as: As = 'div', chil
   );
 }
 
-/** Equal columns. Seven become four and five become three under 1200px; under 900px all collapse to one, or to `narrow`. */
-export function Columns({count, narrow = 1, gap = 'md', align, children}: {count: 2 | 3 | 5 | 7; narrow?: 1 | 2; gap?: Gap; align?: Align; children: ReactNode}) {
+/** Equal columns. Seven become four, five become three and four become two under 1200px; under 900px all collapse to one, or to `narrow`. */
+export function Columns({count, narrow = 1, gap = 'md', align, children}: {count: 2 | 3 | 4 | 5 | 7; narrow?: 1 | 2; gap?: Gap; align?: Align; children: ReactNode}) {
   return (
     <div className={l.columns} data-count={count} data-narrow={narrow} data-gap={gap} data-align={align}>
       {children}

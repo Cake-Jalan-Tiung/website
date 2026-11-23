@@ -112,13 +112,15 @@ html:has(.bar) { scroll-padding-top: calc(var(--cjt-bar-height) + var(--cjt-spac
 
 .columns[data-count='2'] { --columns: 2; }
 .columns[data-count='3'] { --columns: 3; }
+.columns[data-count='4'] { --columns: 4; }
 .columns[data-count='5'] { --columns: 5; }
 .columns[data-count='7'] { --columns: 7; }
 
-/* Between the phone and the full sheet the gutters give way first, and five columns become three. */
+/* Between the phone and the full sheet the gutters give way first, five columns become three and four become two. */
 @media (max-width: 1199px) {
   .sheet { padding-inline: var(--cjt-space-lg); }
   .bandInner { padding-inline: var(--cjt-space-lg); }
+  .columns[data-count='4'] { --columns: 2; }
   .columns[data-count='5'] { --columns: 3; }
   .columns[data-count='7'] { --columns: 4; }
 }
