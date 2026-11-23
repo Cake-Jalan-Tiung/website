@@ -7,7 +7,7 @@ import {storehubTransaction, type PosSale} from './sale';
 const shop = {storeId: storehub.storeId, products: storehub.products, timeZone: storefront.timeZone};
 
 const sale: PosSale = {
-  orderId: '991e3b40-0387-4f99-95c6-9c30ffb1a8f0',
+  orderId: '0f9a2c51-7d3e-4b8a-9e61-3c5d7a2b8e40',
   paidAt: '2026-11-23T10:16:02.303Z',
   pickupAt: '2026-11-24T00:00:00.000Z',
   paymentMethod: 'fpx',
@@ -23,7 +23,7 @@ describe('storehubTransaction', () => {
     const transaction = storehubTransaction(sale, shop);
     expect(transaction).toMatchObject({
       refId: sale.orderId,
-      invoiceNumber: 'WEB-991E3B',
+      invoiceNumber: 'WEB-0F9A2C',
       storeId: '560ce27f0ce34105ab775d52',
       transactionType: 'Sale',
       transactionTime: sale.paidAt,
@@ -37,7 +37,7 @@ describe('storehubTransaction', () => {
       {productId: '683fe999d7c0ce00083fcfe5', quantity: 2, unitPrice: 19.5, subTotal: 39, total: 39, tax: 0, discount: 0},
     ]);
     // StoreHub only knows Cash or CreditCard, so the real method and the pick-up time go in the comment.
-    expect(transaction.comment).toBe('Web order 991E3B, paid online (fpx), pick-up Tomorrow, 8am');
+    expect(transaction.comment).toBe('Web order 0F9A2C, paid online (fpx), pick-up Tomorrow, 8am');
   });
 
   it('refuses a dish with no StoreHub product rather than record a wrong sale', () => {

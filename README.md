@@ -119,6 +119,8 @@ The production state, what has and has not been tried live, and what is waiting 
 - Staff sessions are HMAC-signed cookies (HttpOnly, Secure, SameSite=Strict) tied to the current PIN. PIN guessing is rate-limited per address and across all addresses.
 - Only signed-in staff can order the RM 1 test item, and only real CHIP payments are ever sent to StoreHub.
 
+Found a vulnerability? Report it privately, as [SECURITY.md](SECURITY.md) describes, not in a public issue.
+
 ## Docs
 
 - [Checkout plan](docs/checkout-plan.md): decisions, the order model, CHIP and StoreHub findings, production state
@@ -126,4 +128,4 @@ The production state, what has and has not been tried live, and what is waiting 
 
 ---
 
-<sub>Private. © Cake Jalan Tiung. All rights reserved.</sub>
+<sub>© Cake Jalan Tiung. All rights reserved. The code is public to read; it is not licensed for reuse.</sub>
