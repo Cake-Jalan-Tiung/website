@@ -200,6 +200,22 @@
       "value": "#DADEFF",
       "source": "token",
       "mode": "light"
+    },
+    {
+      "thing": "--color-border-emphasized",
+      "value": "#111111",
+      "source": "token",
+      "on": "text-input",
+      "only": true,
+      "mode": "light"
+    },
+    {
+      "thing": "--color-border-emphasized",
+      "value": "#111111",
+      "source": "token",
+      "on": "text-area",
+      "only": true,
+      "mode": "light"
     }
   ],
   "lifted": [],

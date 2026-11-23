@@ -2,6 +2,7 @@
 // paused, and a dish can be sold out. Both end on their own (at the start of the next shop day)
 // unless staff choose "until I turn it back on".
 import {addDays, shopClock, shopInstant} from '../storefront/hours';
+import {list} from '../lib/format';
 import type {Storefront} from '../storefront/model';
 import {CartError, TEST_DISH, orderableDish, type CartLine} from './model';
 
@@ -45,14 +46,14 @@ export function closureEnds(store: Storefront, closeFor: CloseFor, now: Date): s
 export function assertAvailable(store: Storefront, cart: readonly CartLine[], availability: Availability) {
   const isTest = cart.some((line) => line.dishId === TEST_DISH.id);
   if (availability.ordersPaused && !isTest) {
-    throw new CartError('We are not taking online orders right now. You are welcome to order at the counter.');
+    throw new CartError('Online orders are paused. You can still order at the counter.');
   }
   const soldOut = cart.flatMap((line) => {
     const dish = orderableDish(store, line.dishId);
     return dish && availability.soldOut[dish.id] ? [dish] : [];
   });
   if (soldOut.length > 0) {
-    const names = soldOut.map((dish) => dish.name).join(' and ');
-    throw new CartError(`${names} ${soldOut.length === 1 ? 'is' : 'are'} sold out for now. Remove ${soldOut.length === 1 ? 'it' : 'them'} to carry on.`);
+    const names = list(soldOut.map((dish) => dish.name));
+    throw new CartError(`${names} ${soldOut.length === 1 ? 'is' : 'are'} sold out. Remove ${soldOut.length === 1 ? 'it' : 'them'} to carry on.`);
   }
 }

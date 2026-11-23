@@ -4,8 +4,9 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {Button} from '@astryxdesign/core/Button';
 import {getTestPayment} from '../../../orders/functions';
 import {formatRM} from '../../../orders/model';
-import {Sections} from '../../../storefront/sections';
-import {Row, Stack} from '../../../system/layout';
+import {storefront} from '../../../site/content';
+import {Sections, StoreHeader} from '../../../storefront/sections';
+import {Page, Row, Stack} from '../../../system/layout';
 import {Type} from '../../../system/Type';
 
 /**
@@ -28,6 +29,7 @@ export const Route = createFileRoute('/pay/test/$id')({
       window.location.assign(`/order/${order.id}`);
     };
     return (
+      <Page top={<StoreHeader store={storefront} mode="focus" />}>
       <Sections>
         <Stack gap="lg">
           <Banner status="warning" title="Test payment" description="This page stands in for the payment provider while the shop's CHIP keys are not set. No money moves." />
@@ -38,6 +40,7 @@ export const Route = createFileRoute('/pay/test/$id')({
           </Row>
         </Stack>
       </Sections>
+      </Page>
     );
   },
 });

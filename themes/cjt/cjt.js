@@ -696,6 +696,20 @@ export const cjtTheme = {
         "borderColor": "var(--color-border)",
         "boxShadow": "none"
       }
+    },
+    "text-input": {
+      "base": {
+        "@light": {
+          "--color-border-emphasized": "#111111"
+        }
+      }
+    },
+    "text-area": {
+      "base": {
+        "@light": {
+          "--color-border-emphasized": "#111111"
+        }
+      }
     }
   },
   __onDark: {

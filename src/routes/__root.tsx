@@ -9,12 +9,14 @@ import {Link} from '@astryxdesign/core/Link';
 import {Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {Sections} from '../storefront/sections';
+import {color} from '../system/tokens';
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       {charSet: 'utf-8'},
-      {name: 'viewport', content: 'width=device-width, initial-scale=1'},
+      {name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover'},
+      {name: 'theme-color', content: color.paper},
       {title: 'Cake Jalan Tiung — Shah Alam'},
     ],
   }),

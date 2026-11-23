@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
-import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, parseCustomer, priceCart, servingWindow} from './model';
+import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
 import {isOpenSlot, pickupSlots} from './pickup';
 
@@ -79,6 +79,22 @@ describe('parseCustomer', () => {
     [{name: 'Aina', phone: '0123456789', email: 'nope'}],
   ])('refuses %j', (input) => {
     expect(() => parseCustomer(input)).toThrow(CartError);
+  });
+});
+
+describe('customerProblems', () => {
+  const good = {name: 'Aina', phone: '012-345 6789', email: 'aina@example.com'};
+  it('finds nothing wrong with good details', () => {
+    expect(customerProblems(good)).toEqual({});
+  });
+  it('names only the fields that need a fix, each in its own words', () => {
+    expect(customerProblems({...good, email: ''})).toEqual({email: 'Enter an email for your receipt.'});
+    expect(customerProblems({...good, email: 'aina@'})).toEqual({email: 'Enter an email like name@example.com.'});
+    expect(customerProblems({...good, name: 'x'.repeat(61)})).toEqual({name: 'Use a name of 60 characters or fewer.'});
+    expect(Object.keys(customerProblems({}))).toEqual(['name', 'phone', 'email']);
+  });
+  it('is what the server refuses with', () => {
+    expect(() => parseCustomer({...good, phone: '123'})).toThrow('Enter a Malaysian mobile number, like 012-345 6789.');
   });
 });
 

@@ -31,15 +31,22 @@ function parseCart(value: unknown): CartLine[] {
   });
 }
 
-type Result<T> = ({ok: true} & T) | {ok: false; message: string};
-const failure = (error: unknown): {ok: false; message: string} => {
-  if (error instanceof CartError) return {ok: false, message: error.message};
+/** A refusal says whether trying again can help: a cart the shop cannot take stays refused until the bag changes. */
+type Failure = {ok: false; message: string; canRetry?: boolean};
+type Result<T> = ({ok: true} & T) | Failure;
+/** What a customer reads when the shop failed on its side: what did not happen, and what to do. */
+const FAILED = {
+  load: `Checkout didn’t load. Try again, or order at the counter on ${storefront.phone.display}.`,
+  pay: 'Payment didn’t open, and nothing was taken. Try again.',
+} as const;
+const failure = (error: unknown, during: keyof typeof FAILED): Failure => {
+  if (error instanceof CartError) return {ok: false, message: error.message, canRetry: false};
   alertLater({
     key: 'checkout-error',
     subject: 'Checkout failed for a customer',
     body: `A customer saw "Something went wrong" at checkout: ${String(error)}\n\nIf this repeats, customers cannot order. Check the Worker's logs and whether CHIP is reachable.`,
   });
-  return {ok: false, message: 'Something went wrong on our side. Nothing was charged; please try again.'};
+  return {ok: false, message: FAILED[during], canRetry: true};
 };
 
 export type CheckoutOptions = {cart: PricedCart; slots: Slot[]; methods: PaymentMethod[]; window: ReturnType<typeof servingWindow> | null};
@@ -60,7 +67,7 @@ export const getCheckoutOptions = createServerFn({method: 'POST'})
         window: window ?? null,
       };
     } catch (error) {
-      return failure(error);
+      return failure(error, 'load');
     }
   });
 
@@ -106,7 +113,7 @@ export const placeOrder = createServerFn({method: 'POST'})
       await orders.attachPurchase(id, checkout.purchaseId);
       return {ok: true, redirectUrl: checkout.redirectUrl};
     } catch (error) {
-      return failure(error);
+      return failure(error, 'pay');
     }
   });
 

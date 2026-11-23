@@ -21,6 +21,10 @@ describe('storefront content', () => {
     expect(() => dishesById(storefront, covers)).not.toThrow();
   });
 
+  it('puts only dishes with a drawing on the counter', () => {
+    const dishes = dishesById(storefront, storefront.counter?.dishes ?? []);
+    expect(dishes.filter((dish) => !dish.drawing).map((dish) => dish.id)).toEqual([]);
+  });
   it('prices every dish in whole sen', () => {
     for (const dish of dishes) expect(Math.round(dish.price * 100)).toBeCloseTo(dish.price * 100, 6);
   });

@@ -66,8 +66,11 @@ html:has(.bar) { scroll-padding-top: calc(var(--cjt-bar-height) + var(--cjt-spac
   to { transform: translateX(calc(-100% - var(--gap))); }
 }
 /* It stops under the pointer, on a tap, and from its button. */
-.marquee:hover > .marqueeRun,
 .marquee[data-paused] > .marqueeRun { animation-play-state: paused; }
+/* Under a pointer only: on touch, :hover sticks after a tap and would stop a second tap resuming it. */
+@media (hover: hover) {
+  .marquee:hover > .marqueeRun { animation-play-state: paused; }
+}
 /* The button is for the keyboard: out of sight until it has focus. */
 .marqueePause {
   position: absolute;

@@ -37,12 +37,10 @@ export type Storefront = {
   address: readonly string[];
   phone: {display: string; href: string};
   week: Week;
-  /** The week in one line, for the ticker and the menu. */
+  /** The week in one line, for the menu and the footer. */
   hoursLine: string;
   /** The line every page ends on. */
   signOff: string;
-  /** The passing line over the header: short, true, and current. */
-  announcements: readonly string[];
   nav: readonly Action[];
   /** Where to order delivery while the site only takes pick-up orders; omit once it delivers. */
   delivery?: Action;
@@ -57,6 +55,8 @@ export type Storefront = {
   bestSellers: readonly string[];
   /** The dish whose photo stands in for the hero until there is a `hero` photo. */
   heroCover?: string;
+  /** Dishes for the hero's counter, in place of its photo: each must have a drawing, which is what the counter shows. */
+  counter?: {dishes: readonly string[]};
   /** The season's dish, when the shop has one. */
   inSeason?: {flavour: Flavour; dishId: string};
   mapHref: string;

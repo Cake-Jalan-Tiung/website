@@ -46,7 +46,7 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
   const next = kitchenNext(order.status);
   const minutes = minutesUntil(order.pickupAt, Date.now());
   return (
-    <article className={s.ticket} data-new={isNew ? '' : undefined} aria-label={`Order ${order.code} for ${order.name}`}>
+    <article className={s.staffTicket} data-new={isNew ? '' : undefined} aria-label={`Order ${order.code} for ${order.name}`}>
       <span className={s.ticketHead}>
         <Type role="subhead" as="h3">
           <span className={s.code}>{order.code}</span> · {order.name}

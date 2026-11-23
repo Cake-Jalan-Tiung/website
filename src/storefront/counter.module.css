@@ -1,0 +1,92 @@
+/* The counter as a menu: three across on ink hairlines, a drawing over each dish's name and
+   price, + on the drawing's corner. The last cell is an ink block that leads to the full menu. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--cjt-color-ink);
+  border-left: 1px solid var(--cjt-color-ink);
+}
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--cjt-space-xs) / 2);
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--cjt-space-xs) var(--cjt-space-xs) var(--cjt-space-sm);
+  border-right: 1px solid var(--cjt-color-ink);
+  border-bottom: 1px solid var(--cjt-color-ink);
+}
+.art { position: relative; display: block; aspect-ratio: 1; }
+.arrive { display: block; width: 100%; height: 100%; }
+.arrive > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* + sits on the drawing's corner, above the name's stretched hit area. */
+.corner { position: absolute; right: calc(-1 * var(--cjt-space-xs)); bottom: 0; z-index: 1; }
+.name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-weight: var(--cjt-weight-medium); line-height: var(--cjt-leading-caption); }
+.price { font-variant-numeric: tabular-nums; }
+@media (hover: hover) {
+  .cell:hover .name { text-decoration: underline; text-underline-offset: 0.2em; }
+}
+
+/* The way to everything else: the whole cell, ink, the words at its foot. */
+.cell[data-more] { padding: 0; }
+.more { display: flex; flex: 1; color: inherit; text-decoration: none; }
+.more:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -4px; }
+.moreFace { display: flex; flex: 1; flex-direction: column; justify-content: flex-end; padding: var(--cjt-space-sm); }
+
+/* On a phone, two across: each drawing keeps room beside its +. */
+@media (max-width: 599px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Motion, only where it is welcome; all of it ends within two seconds ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* The rules draw first, from the top left. */
+  .grid { animation: wipe 700ms cubic-bezier(0.65, 0, 0.35, 1) var(--enter-delay, 0ms) both; }
+
+  /* Then each dish rises into its cell, one after another. */
+  .cell { --i: 0; animation: rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--enter-delay, 0ms) + 350ms + var(--i) * 90ms); }
+  .cell:nth-child(2) { --i: 1; }
+  .cell:nth-child(3) { --i: 2; }
+  .cell:nth-child(4) { --i: 3; }
+  .cell:nth-child(5) { --i: 4; }
+  .cell:nth-child(6) { --i: 5; }
+
+  /* Their pink marks (steam, crumbs) float up into place after them. */
+  .arrive :is(path, circle)[style*='mark-pink'] {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: waft 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--enter-delay, 0ms) + 950ms + var(--i) * 90ms);
+  }
+
+  .arrive > svg { transform-origin: 50% 80%; transition: transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+}
+
+/* Under a pointer, a drawing lifts and tilts, and its pink marks breathe again. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .cell:hover .arrive > svg { transform: translateY(-6%) rotate(-4deg); }
+  .cell:hover :is(path, circle)[style*='mark-pink'] { animation: waft-again 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+
+@keyframes wipe {
+  from { clip-path: inset(0 100% 100% 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10%); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes waft {
+  from { opacity: 0; transform: translateY(60%) scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes waft-again {
+  0% { opacity: 1; transform: none; }
+  45% { opacity: 0; transform: translateY(-50%); }
+  46% { opacity: 0; transform: translateY(50%) scale(0.7); }
+  100% { opacity: 1; transform: none; }
+}
