@@ -1,18 +1,18 @@
 import {describe, expect, it} from 'vitest';
 import type {Alert} from './alert.server';
 import type {PaymentState} from '../payments/provider';
-import {REFUND_LOOKBACK_DAYS, REFUND_RECHECK_HOURS, catchRefunds, type RefundDeps} from './refunds';
+import {REFUND_FIRST_CHECK_HOURS, REFUND_LOOKBACK_DAYS, REFUND_RECHECK_HOURS, catchRefunds, type RefundDeps} from './refunds';
 
 const now = new Date('2026-11-23T10:00:00.000Z');
 
 function setup(states: Record<string, PaymentState | Error>) {
   const events: string[] = [];
   const alerts: Alert[] = [];
-  const asked: {paidSince?: Date; checkedBefore?: Date} = {};
+  const asked: {paidSince?: Date; paidBefore?: Date; checkedBefore?: Date} = {};
   const deps: RefundDeps = {
     orders: {
-      refundCheckDue: async (paidSince, checkedBefore) => {
-        Object.assign(asked, {paidSince, checkedBefore});
+      refundCheckDue: async (window) => {
+        Object.assign(asked, window);
         return Object.keys(states).map((id) => ({id, purchaseId: `p-${id}`}));
       },
       markRefundChecked: async (id) => void events.push(`checked ${id}`),
@@ -39,10 +39,11 @@ describe('catchRefunds', () => {
     expect(alerts).toEqual([]);
   });
 
-  it('asks about the last month, skipping orders asked about within the last few hours', async () => {
+  it('asks about the last month, leaving just-paid orders to the board and recently asked ones alone', async () => {
     const {deps, asked} = setup({});
     await catchRefunds(deps);
     expect(asked.paidSince).toEqual(new Date(now.getTime() - REFUND_LOOKBACK_DAYS * 86_400_000));
+    expect(asked.paidBefore).toEqual(new Date(now.getTime() - REFUND_FIRST_CHECK_HOURS * 3_600_000));
     expect(asked.checkedBefore).toEqual(new Date(now.getTime() - REFUND_RECHECK_HOURS * 3_600_000));
   });
 

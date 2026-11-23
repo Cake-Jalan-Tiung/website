@@ -45,8 +45,13 @@ describe('storehubTransaction', () => {
     expect(storehubTransaction(sale, {...shop, paymentMethod: 'Website'}).paymentMethod).toBe('Website');
   });
 
+  it('refuses a sale whose lines are missing or do not make what was paid', () => {
+    expect(() => storehubTransaction({...sale, items: []}, shop)).toThrow(/0 lines/);
+    expect(() => storehubTransaction({...sale, totalSen: sale.totalSen + 1}, shop)).toThrow(/not the/);
+  });
+
   it('refuses a dish with no StoreHub product rather than record a wrong sale', () => {
-    expect(() => storehubTransaction({...sale, items: [{dishId: 'not-mapped', name: 'X', unitSen: 100, quantity: 1}]}, shop)).toThrow(/not-mapped/);
+    expect(() => storehubTransaction({...sale, totalSen: 100, items: [{dishId: 'not-mapped', name: 'X', unitSen: 100, quantity: 1}]}, shop)).toThrow(/not-mapped/);
   });
 });
 

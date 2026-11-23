@@ -45,8 +45,8 @@ function notFound(text: string) {
 export function storehubClient({username, token}: {username: string; token: string}): StorehubClient {
   const authorization = `Basic ${btoa(`${username}:${token}`)}`;
 
-  /** Answers whether StoreHub said the resource does not exist; any other failure throws. */
-  async function post(path: string, body: unknown): Promise<'done' | 'not-found'> {
+  /** Posts to StoreHub; any failure throws, except StoreHub saying the resource does not exist when `notFoundIsDone`. */
+  async function post(path: string, body: unknown, {notFoundIsDone = false} = {}): Promise<void> {
     if (!token) throw new StorehubError(401, 'STOREHUB_API_TOKEN is not set on the Worker');
     let response: Response;
     try {
@@ -59,18 +59,14 @@ export function storehubClient({username, token}: {username: string; token: stri
     } catch (error) {
       throw new StorehubError(null, `StoreHub ${path} did not answer: ${String(error)}`);
     }
-    if (response.ok) return 'done';
+    if (response.ok) return;
     const text = await response.text();
-    if (response.status === 404 && notFound(text)) return 'not-found';
+    if (notFoundIsDone && response.status === 404 && notFound(text)) return;
     throw new StorehubError(response.status, `StoreHub ${path} failed (${response.status}): ${text.slice(0, 500)}`);
   }
 
   return {
-    async recordSale(transaction) {
-      if ((await post('/transactions', transaction)) === 'not-found') throw new StorehubError(404, 'StoreHub /transactions was not found');
-    },
-    async cancelSale(refId, at) {
-      await post(`/transactions/${encodeURIComponent(refId)}/cancel`, {cancelledTime: at.toISOString()});
-    },
+    recordSale: (transaction) => post('/transactions', transaction),
+    cancelSale: (refId, at) => post(`/transactions/${encodeURIComponent(refId)}/cancel`, {cancelledTime: at.toISOString()}, {notFoundIsDone: true}),
   };
 }

@@ -32,9 +32,11 @@ describe('storehubClient', () => {
     await expect(client().cancelSale('x', new Date())).rejects.toMatchObject({status: 404});
   });
 
-  it('never counts a sale as recorded on a 404', async () => {
-    storehubAnswers(404, {code: 'ResourceNotFound'});
-    await expect(client().recordSale(sale)).rejects.toBeInstanceOf(StorehubError);
+  it('never counts a sale as recorded on a 404, and keeps what StoreHub said', async () => {
+    storehubAnswers(404, {code: 'ResourceNotFound', message: 'product 602b not found'});
+    const error = await client().recordSale(sale).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(StorehubError);
+    expect(error).toMatchObject({status: 404, message: expect.stringContaining('product 602b not found')});
   });
 
   it('reports the status of a refused call, and never calls StoreHub without a token', async () => {

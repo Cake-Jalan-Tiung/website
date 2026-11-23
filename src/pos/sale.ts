@@ -27,8 +27,12 @@ export type StorehubTransaction = {
 
 const ringgit = (sen: number) => sen / 100;
 
-/** The Add Transaction body for a paid order. Throws when a dish has no StoreHub product. */
+/** The Add Transaction body for a paid order. Throws when a dish has no StoreHub product, or the lines do not make the total. */
 export function storehubTransaction(sale: PosSale, shop: PosShop): StorehubTransaction {
+  const linesSen = sale.items.reduce((sum, line) => sum + line.unitSen * line.quantity, 0);
+  if (sale.items.length === 0 || linesSen !== sale.totalSen) {
+    throw new Error(`Order ${orderCode(sale.orderId)}: its ${sale.items.length} lines make ${linesSen} sen, not the ${sale.totalSen} sen paid`);
+  }
   const products = new Map(Object.entries(shop.products));
   const items = sale.items.map((line): StorehubItem => {
     const productId = products.get(line.dishId);

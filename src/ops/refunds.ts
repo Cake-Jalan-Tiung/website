@@ -5,14 +5,19 @@ import type {Alert} from './alert.server';
 import {orderCode, type OrderStatus} from '../orders/model';
 import type {PaymentState} from '../payments/provider';
 
-/** How far back a refund is looked for, how often each sold order is asked about, and how many per run. */
+/**
+ * How far back a refund is looked for, how long after payment the first look waits (orders on the
+ * kitchen board are watched by the board itself), how often each sold order is asked about, and
+ * how many per run.
+ */
 export const REFUND_LOOKBACK_DAYS = 30;
+export const REFUND_FIRST_CHECK_HOURS = 1;
 export const REFUND_RECHECK_HOURS = 6;
 const PER_RUN = 10;
 
 export type RefundDeps = {
   orders: {
-    refundCheckDue(paidSince: Date, checkedBefore: Date, limit: number): Promise<{id: string; purchaseId: string}[]>;
+    refundCheckDue(window: {paidSince: Date; paidBefore: Date; checkedBefore: Date}, limit: number): Promise<{id: string; purchaseId: string}[]>;
     markRefundChecked(id: string, at: Date): Promise<void>;
     move(id: string, to: OrderStatus, now: Date): Promise<boolean>;
   };
@@ -22,9 +27,9 @@ export type RefundDeps = {
 };
 
 export async function catchRefunds({orders, provider, alert, now}: RefundDeps): Promise<void> {
+  const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
   const due = await orders.refundCheckDue(
-    new Date(now.getTime() - REFUND_LOOKBACK_DAYS * 86_400_000),
-    new Date(now.getTime() - REFUND_RECHECK_HOURS * 3_600_000),
+    {paidSince: hoursAgo(REFUND_LOOKBACK_DAYS * 24), paidBefore: hoursAgo(REFUND_FIRST_CHECK_HOURS), checkedBefore: hoursAgo(REFUND_RECHECK_HOURS)},
     PER_RUN,
   );
   for (const order of due) {

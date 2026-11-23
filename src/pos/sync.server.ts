@@ -14,6 +14,14 @@ const PACE_MS = 400;
 
 export async function syncPosSales(env: SyncEnv) {
   if (!posSyncOn(env.PAYMENTS)) return;
+  if (!env.STOREHUB_API_TOKEN) {
+    await sendAlert({
+      key: 'storehub-auth',
+      subject: 'STOREHUB_API_TOKEN is not set on the Worker',
+      body: 'No web sale can reach StoreHub until it is set: cf workers secrets update STOREHUB_API_TOKEN --worker cakejalantiung\n\nSales waiting are sent on the next run after that; none are lost.',
+    });
+    return;
+  }
   await syncPos({
     ledger: ordersRepo(env.DB, env.SHOP_ID),
     pos: storehubClient({username: storehub.username, token: env.STOREHUB_API_TOKEN}),

@@ -134,14 +134,18 @@ export function ordersRepo(db: D1Database, shopId: string) {
       return rows.results.map((row) => ({id: row.id, purchaseId: row.purchase_id, createdAt: row.created_at}));
     },
 
-    /** Sold orders not yet recorded in the POS, oldest payment first. */
+    /**
+     * Sold orders not yet recorded in the POS, newest payment first, so sales StoreHub keeps
+     * refusing never hold back the day's new ones. Both reads take the same rows: ties on
+     * paid_at are broken by id, or a sale could be sent without its items.
+     */
     async posUnrecorded(limit: number): Promise<PosSale[]> {
       const where = `shop_id = ? AND ${UNRECORDED}`;
       const binds = [shopId, ...UNRECORDED_BINDS];
       const [orders, items] = await Promise.all([
-        db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen FROM orders WHERE ${where} ORDER BY paid_at LIMIT ?`).bind(...binds, limit)
+        db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen FROM orders WHERE ${where} ORDER BY paid_at DESC, id LIMIT ?`).bind(...binds, limit)
           .all<{id: string; paid_at: string; pickup_at: string; payment_method: string; total_sen: number}>(),
-        db.prepare(`SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE ${where} ORDER BY paid_at LIMIT ?)`).bind(...binds, limit).all<ItemRecord>(),
+        db.prepare(`SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE ${where} ORDER BY paid_at DESC, id LIMIT ?)`).bind(...binds, limit).all<ItemRecord>(),
       ]);
       return orders.results.map((order) => ({
         orderId: order.id,
@@ -153,9 +157,9 @@ export function ordersRepo(db: D1Database, shopId: string) {
       }));
     },
 
-    /** Refunded orders whose POS sale has not been cancelled yet. */
+    /** Refunded orders whose POS sale has not been cancelled yet, newest refund first. */
     async posUncancelled(limit: number): Promise<string[]> {
-      const rows = await db.prepare(`SELECT id FROM orders WHERE shop_id = ? AND ${UNCANCELLED} ORDER BY updated_at LIMIT ?`).bind(shopId, limit).all<{id: string}>();
+      const rows = await db.prepare(`SELECT id FROM orders WHERE shop_id = ? AND ${UNCANCELLED} ORDER BY updated_at DESC, id LIMIT ?`).bind(shopId, limit).all<{id: string}>();
       return rows.results.map((row) => row.id);
     },
 
@@ -176,17 +180,17 @@ export function ordersRepo(db: D1Database, shopId: string) {
     },
 
     /**
-     * Sold orders paid since `paidSince` that the provider has not been asked about since
-     * `checkedBefore`, never-asked first: the refund sweep's next batch.
+     * Sold orders paid between `paidSince` and `paidBefore` that the provider has not been asked
+     * about since `checkedBefore`, never-asked first: the refund sweep's next batch.
      */
-    async refundCheckDue(paidSince: Date, checkedBefore: Date, limit: number): Promise<{id: string; purchaseId: string}[]> {
+    async refundCheckDue(window: {paidSince: Date; paidBefore: Date; checkedBefore: Date}, limit: number): Promise<{id: string; purchaseId: string}[]> {
       const rows = await db
         .prepare(
           `SELECT id, purchase_id FROM orders WHERE shop_id = ? AND status IN (${placeholders(SOLD_STATUSES)}) AND purchase_id IS NOT NULL
-             AND paid_at >= ? AND (refund_checked_at IS NULL OR refund_checked_at < ?)
+             AND paid_at >= ? AND paid_at < ? AND (refund_checked_at IS NULL OR refund_checked_at < ?)
            ORDER BY refund_checked_at IS NOT NULL, refund_checked_at, paid_at LIMIT ?`,
         )
-        .bind(shopId, ...SOLD_STATUSES, paidSince.toISOString(), checkedBefore.toISOString(), limit)
+        .bind(shopId, ...SOLD_STATUSES, window.paidSince.toISOString(), window.paidBefore.toISOString(), window.checkedBefore.toISOString(), limit)
         .all<{id: string; purchase_id: string}>();
       return rows.results.map((row) => ({id: row.id, purchaseId: row.purchase_id}));
     },
