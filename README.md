@@ -5,7 +5,7 @@
 **The online shop for Cake Jalan Tiung, Seksyen 4, Shah Alam.**
 Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or card, and collect at the counter.
 
-[cakejalantiung.hazli-johar.workers.dev](https://cakejalantiung.hazli-johar.workers.dev)
+[cakejalantiung.app](https://cakejalantiung.app)
 
 </div>
 

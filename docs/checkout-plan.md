@@ -64,7 +64,7 @@ pnpm dev                          # /menu → bag → /checkout → /pay/test �
 
 ## Production
 
-- Live at `https://cakejalantiung.hazli-johar.workers.dev`, deployed with `pnpm deploy` (`cf deploy`).
+- Live at `https://cakejalantiung.app` (and `www.`), with `https://cakejalantiung.hazli-johar.workers.dev` still serving, deployed with `pnpm deploy` (`cf deploy`).
 - Cloudflare account and D1 database are pinned in `cloudflare.config.ts` (`accountId`, the `DB` id): Hazli Johar's account, D1 `cakejalantiung` in APAC. Handing the site to the client means a new account id, a new D1 database with `migrations/` applied, and the secrets set again.
 - Secrets on the Worker: `PAYMENTS=chip`, `CHIP_SECRET_KEY`, `CHIP_BRAND_ID`, `STAFF_PIN` (6+ digits), `SESSION_SECRET`, `STOREHUB_API_TOKEN`, `ALERT_TO`. Change one with `cf workers secrets update <NAME> --worker cakejalantiung`. A new `STAFF_PIN` signs every staff device out.
 - A brand-new Worker cannot hold secrets before it exists, so its first deploy is `cf deploy --secrets-file <file>`; delete the file afterwards.
