@@ -81,10 +81,14 @@ export const bag = {
   add(dishId: string) {
     bag.set(dishId, quantityOf(dishId) + 1);
   },
-  /** Adds every line to what is already in the bag, in one change; each dish stops at the maximum. */
-  addAll(added: readonly CartLine[]) {
+  /**
+   * Makes sure the bag holds at least these lines, each dish at no less than its quantity, in
+   * one change. Repeating it changes nothing, so a second tap never doubles an order. Lines go
+   * through the bag's own rules first: a dish no longer on the menu is left out.
+   */
+  include(wanted: readonly CartLine[]) {
     const next = new Map(load().map((line) => [line.dishId, line.quantity]));
-    for (const line of added) next.set(line.dishId, Math.min(MAX_QUANTITY, (next.get(line.dishId) ?? 0) + line.quantity));
+    for (const line of parseLines(wanted)) next.set(line.dishId, Math.max(next.get(line.dishId) ?? 0, line.quantity));
     commit([...next].map(([dishId, quantity]) => ({dishId, quantity})));
   },
   clear() {
@@ -93,3 +97,31 @@ export const bag = {
 };
 
 export const countOf = (cart: readonly CartLine[]) => cart.reduce((sum, line) => sum + line.quantity, 0);
+
+// The orders this bag has gone to pay for. The bag empties when one of them is paid, and only
+// then: an order page opened later, for an older order or from another tab, never touches a bag
+// the customer is building now.
+const PAYING_KEY = 'cjt.paying.v1';
+/** Retries of a failed payment each make an order; a few are kept, as any of them may be the one paid. */
+const PAYING_KEPT = 5;
+
+function readPaying(): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(PAYING_KEY) ?? '[]');
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Checkout calls this as the bag leaves to be paid for as `orderId`. */
+export function payingFor(orderId: string) {
+  window.localStorage.setItem(PAYING_KEY, JSON.stringify([orderId, ...readPaying().filter((id) => id !== orderId)].slice(0, PAYING_KEPT)));
+}
+
+/** The order page calls this once `orderId` is paid: if this bag went to pay for it, the bag has done its job. */
+export function settleBag(orderId: string) {
+  if (!readPaying().includes(orderId)) return;
+  window.localStorage.removeItem(PAYING_KEY);
+  bag.clear();
+}

@@ -5,8 +5,8 @@ import {useEffect, useState, type ReactNode} from 'react';
 import {bag} from '../orders/bag';
 import {useAvailability} from '../orders/availability-store';
 import {getOrder, type PublicOrder} from '../orders/functions';
-import {CUSTOMER_STEPS, customerCopy, formatRM, isFinished, orderableDish, type CartLine} from '../orders/model';
-import {useRecentOrder, type RecentOrder} from '../orders/recent';
+import {CUSTOMER_STEPS, customerCopy, formatRM, isFinished, orderableDish} from '../orders/model';
+import {orderAgainLines, useRecentOrder, type RecentOrder} from '../orders/recent';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
 import {Type} from '../system/Type';
@@ -24,10 +24,10 @@ const isTracked = (order: PublicOrder, now: number) =>
 function useTracked(recent: RecentOrder | null) {
   const [tracked, setTracked] = useState<PublicOrder | null | undefined>(undefined);
   const id = recent?.id;
-  const pickupAt = recent?.pickupAt;
+  // Long past its pick-up, the order needs no asking: Order again shows at once, with no jump.
+  const past = recent !== null && Date.now() > Date.parse(recent.pickupAt) + TRACK_HOURS * 3_600_000;
   useEffect(() => {
-    if (!id || !pickupAt) return;
-    if (Date.now() > Date.parse(pickupAt) + TRACK_HOURS * 3_600_000) return setTracked(null);
+    if (!id || past) return;
     let live = true;
     getOrder({data: {id}}).then(
       (order) => live && setTracked(order && isTracked(order, Date.now()) ? order : null),
@@ -36,8 +36,8 @@ function useTracked(recent: RecentOrder | null) {
     return () => {
       live = false;
     };
-  }, [id, pickupAt]);
-  return tracked;
+  }, [id, past]);
+  return past ? null : tracked;
 }
 
 function Strip({children}: {children: ReactNode}) {
@@ -51,7 +51,7 @@ function Strip({children}: {children: ReactNode}) {
 export function LastOrder({store}: {store: Storefront}) {
   const recent = useRecentOrder();
   const tracked = useTracked(recent);
-  const {ordersPaused, soldOut} = useAvailability();
+  const availability = useAvailability();
   if (!recent || tracked === undefined) return null;
 
   if (tracked) {
@@ -69,8 +69,8 @@ export function LastOrder({store}: {store: Storefront}) {
     );
   }
 
-  const lines: CartLine[] = recent.lines.filter((line) => !soldOut[line.dishId]);
-  if (ordersPaused || lines.length === 0) return null;
+  const lines = orderAgainLines(recent.lines, availability);
+  if (lines.length === 0) return null;
   const named = lines.flatMap((line) => {
     const dish = orderableDish(store, line.dishId);
     return dish ? [{...line, dish}] : [];
@@ -90,7 +90,7 @@ export function LastOrder({store}: {store: Storefront}) {
         className={s.againButton}
         aria-label={`Order again: ${summary}, ${formatRM(totalSen)}`}
         onClick={() => {
-          bag.addAll(lines);
+          bag.include(lines);
           window.location.assign('/checkout');
         }}
       >

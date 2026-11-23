@@ -15,6 +15,10 @@
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--cjt-space-xl); align-items: start; }
 .form { display: flex; flex-direction: column; min-width: 0; }
 .summary { position: sticky; top: calc(var(--store-header-h, 64px) + var(--cjt-space-md)); display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; }
+/* Held beside the form, the bag never runs past the foot of the screen: a long one scrolls inside itself, so the total stays in reach. */
+@media (min-width: 900px) {
+  .summary { max-height: calc(100svh - var(--store-header-h, 64px) - var(--cjt-space-xl)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
 
 .step { display: flex; flex-direction: column; gap: var(--cjt-space-md); padding-block: var(--cjt-space-lg); border-top: var(--store-heavy, 4px) solid var(--cjt-color-ink); }
 .stepHead { display: flex; align-items: baseline; gap: var(--cjt-space-sm); }
@@ -34,7 +38,7 @@
 .addOns { display: flex; flex-direction: column; gap: var(--cjt-space-sm); padding-block: var(--cjt-space-sm); border-bottom: 1px solid var(--cjt-color-rule); }
 .addOnList { display: grid; grid-auto-columns: calc(var(--cjt-space-2xl) + var(--cjt-space-md)); grid-auto-flow: column; gap: var(--cjt-space-sm); margin: 0; padding: 0; overflow-x: auto; list-style: none; scrollbar-width: none; scroll-snap-type: x mandatory; }
 .addOnList::-webkit-scrollbar { display: none; }
-.addOn { display: flex; flex-direction: column; gap: 2px; min-width: 0; scroll-snap-align: start; }
+.addOn { display: flex; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); min-width: 0; scroll-snap-align: start; }
 .addOnMedia { position: relative; display: block; margin-bottom: var(--cjt-space-xs); }
 .addOnCorner { position: absolute; right: 0; bottom: 0; }
 .addOnName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: var(--cjt-leading-caption); }

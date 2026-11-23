@@ -3,7 +3,8 @@ import {storefront} from '../site/content';
 import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, isFinished, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
 import {isOpenSlot, pickupPromise, pickupSlots} from './pickup';
-import {parseRecent} from './recent';
+import {orderAgainLines, parseRecent} from './recent';
+import {OPEN} from './availability';
 
 describe('priceCart', () => {
   it('prices from the catalogue in sen', () => {
@@ -110,6 +111,19 @@ describe('parseRecent', () => {
     expect(parseRecent(JSON.stringify({...order, pickupAt: 'soon', lines: [{dishId: 'shio-pan', quantity: 1}]}))).toBeNull();
     expect(parseRecent('not json')).toBeNull();
     expect(parseRecent(null)).toBeNull();
+  });
+});
+
+describe('orderAgainLines', () => {
+  const lines = [{dishId: 'shio-pan', quantity: 2}, {dishId: 'croissant', quantity: 1}, {dishId: 'gone', quantity: 1}, {dishId: TEST_DISH.id, quantity: 1}];
+
+  it('keeps what is still on the menu, never the staff test item', () => {
+    expect(orderAgainLines(lines, OPEN)).toEqual([{dishId: 'shio-pan', quantity: 2}, {dishId: 'croissant', quantity: 1}]);
+  });
+
+  it('leaves out what is sold out, and everything while orders are paused', () => {
+    expect(orderAgainLines(lines, {...OPEN, soldOut: {croissant: {until: null}}})).toEqual([{dishId: 'shio-pan', quantity: 2}]);
+    expect(orderAgainLines(lines, {...OPEN, ordersPaused: {until: null}})).toEqual([]);
   });
 });
 

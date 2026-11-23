@@ -42,7 +42,7 @@ function toRow(record: OrderRecord, items: ItemRecord[]): OrderRow {
     createdAt: record.created_at,
     paidAt: record.paid_at,
     posRecordedAt: record.pos_recorded_at,
-    arrivedAt: record.arrived_at,
+    arrivedAt: record.arrived_at ?? null,
     items: items.filter((item) => item.order_id === record.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
   };
 }

@@ -6,6 +6,7 @@ import {useSyncExternalStore} from 'react';
 import {isRecord, textAt} from '../lib/guards';
 import {parseLines} from './bag';
 import {TEST_DISH, type CartLine} from './model';
+import type {Availability} from './availability';
 
 export type RecentOrder = {id: string; code: string; pickupAt: string; lines: readonly CartLine[]};
 
@@ -51,12 +52,22 @@ const subscribe = (listener: () => void) => {
 
 export const useRecentOrder = () => useSyncExternalStore(subscribe, load, () => null);
 
-/** Remembers a paid order. A staff test order is never remembered: it is not something to order again. */
+/**
+ * Remembers a paid order, unless a later one is remembered already (an old receipt's link opened
+ * again). A staff test order is never remembered: it is not something to order again.
+ */
 export function rememberOrder(order: {id: string; code: string; pickupAt: string; items: readonly CartLine[]}) {
   if (order.items.some((item) => item.dishId === TEST_DISH.id)) return;
-  if (load()?.id === order.id) return;
+  const known = load();
+  if (known && (known.id === order.id || Date.parse(known.pickupAt) > Date.parse(order.pickupAt))) return;
   const next: RecentOrder = {id: order.id, code: order.code, pickupAt: order.pickupAt, lines: order.items.map(({dishId, quantity}) => ({dishId, quantity}))};
   window.localStorage.setItem(KEY, JSON.stringify(next));
   recent = parseRecent(JSON.stringify(next));
   listeners.forEach((listener) => listener());
+}
+
+/** What of an earlier order can be ordered again right now: dishes still on the menu and not sold out, nothing while orders are paused. */
+export function orderAgainLines(lines: readonly CartLine[], {ordersPaused, soldOut}: Availability): CartLine[] {
+  if (ordersPaused) return [];
+  return parseLines(lines).filter((line) => line.dishId !== TEST_DISH.id && !soldOut[line.dishId]);
 }

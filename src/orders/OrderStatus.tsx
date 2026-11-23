@@ -12,11 +12,12 @@ import {Label} from '../system/components';
 import type {Ground} from '../system/model';
 import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {bag} from './bag';
+import {bag, settleBag} from './bag';
+import {useAvailability} from './availability-store';
 import {OrderTotal} from './Checkout';
 import {arriveForOrder, getOrder, type PublicOrder} from './functions';
 import {CUSTOMER_STEPS, customerCopy, formatRM, isDormant, isFinished, type OrderStatus} from './model';
-import {rememberOrder} from './recent';
+import {orderAgainLines, rememberOrder} from './recent';
 import {useNow} from '../storefront/now';
 import s from './orders.module.css';
 
@@ -55,12 +56,16 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
 
   const reached = CUSTOMER_STEPS.findIndex((step) => step.status === order.status);
   const inKitchen = reached >= 0;
-  // Once the money is in, the bag has done its job, and the order is one to come back to.
+  // Once the money is in, the bag that paid for it has done its job, and the order is one to come back to.
   useEffect(() => {
     if (!inKitchen) return;
-    bag.clear();
+    settleBag(order.id);
     rememberOrder(order);
-  }, [inKitchen, order]);
+    // The order's id, code, pick-up and items never change, so its first paid sighting is the one that counts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inKitchen, order.id]);
+  const availability = useAvailability();
+  const again = orderAgainLines(order.items, availability);
 
   const copy = customerCopy(order.status);
   // The tab's title says where the order is, so a glance at the tabs answers "is it ready?".
@@ -104,10 +109,10 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
             </ol>
           ) : null}
           {inKitchen && !finished ? <Arrival order={order} onArrived={setOrder} /> : null}
-          {order.status === 'collected' ? (
+          {order.status === 'collected' && again.length > 0 ? (
             <Cta
               onClick={() => {
-                bag.addAll(order.items.map(({dishId, quantity}) => ({dishId, quantity})));
+                bag.include(again);
                 window.location.assign('/checkout');
               }}
             >

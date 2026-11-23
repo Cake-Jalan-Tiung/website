@@ -20,7 +20,7 @@ import {Field} from '../system/Field';
 import {count as counted, list} from '../lib/format';
 import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {bag, countOf, useBag, useBagReady} from './bag';
+import {bag, countOf, payingFor, useBag, useBagReady} from './bag';
 import {customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
 import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
 import type {PaymentMethod} from '../payments/provider';
@@ -272,7 +272,10 @@ export function Checkout() {
     window.localStorage.setItem(METHOD_KEY, activeMethod);
     try {
       const result = await placeOrder({data: {cart: lines, customer: details, pickupAt: activeSlot.at, method: activeMethod}});
-      if (result.ok) return window.location.assign(result.redirectUrl);
+      if (result.ok) {
+        payingFor(result.orderId);
+        return window.location.assign(result.redirectUrl);
+      }
       setError(result.message);
       setEditing(true);
     } catch {

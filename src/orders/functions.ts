@@ -80,7 +80,7 @@ export const placeOrder = createServerFn({method: 'POST'})
     pickupAt: textAt(input, 'pickupAt'),
     method: textAt(input, 'method'),
   }))
-  .handler(async ({data}): Promise<Result<{redirectUrl: string}>> => {
+  .handler(async ({data}): Promise<Result<{orderId: string; redirectUrl: string}>> => {
     try {
       const now = new Date();
       const payments = provider();
@@ -112,7 +112,7 @@ export const placeOrder = createServerFn({method: 'POST'})
           throw error;
         });
       await orders.attachPurchase(id, checkout.purchaseId);
-      return {ok: true, redirectUrl: checkout.redirectUrl};
+      return {ok: true, orderId: id, redirectUrl: checkout.redirectUrl};
     } catch (error) {
       return failure(error, 'pay');
     }

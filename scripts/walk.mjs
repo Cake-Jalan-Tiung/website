@@ -142,6 +142,19 @@ const orderCode = (await page.locator('p').filter({hasText: /^[0-9A-F]{6}$/}).fi
 await page.goto(`${base}/`, {waitUntil: 'networkidle'});
 await settle();
 expect((await page.getByRole('link', {name: new RegExp(`Order ${orderCode}.*Track`)}).count()) === 1, 'home leads back to the order in the kitchen');
+expect((await page.getByRole('link', {name: /^\d+ View bag/}).count()) === 0, 'the paid bag is empty');
+// A bag started now survives opening the order page again.
+await page.goto(`${base}/menu`, {waitUntil: 'networkidle'});
+await page.getByRole('button', {name: /^Add .* to bag$/}).first().click();
+await page.goto(orderUrl, {waitUntil: 'networkidle'});
+await settle();
+await page.waitForTimeout(4500);
+await page.goto(`${base}/`, {waitUntil: 'networkidle'});
+await settle();
+expect((await page.getByRole('link', {name: /^1 View bag/}).count()) === 1, 'revisiting a paid order leaves a new bag alone');
+await page.evaluate(() => localStorage.removeItem('cjt.bag.v1'));
+await page.reload({waitUntil: 'networkidle'});
+await settle();
 await screen('home-tracking');
 // I'm here opens near the pick-up time, so a tap at home cannot ring the kitchen.
 const arrivalOpen = Date.now() >= Date.parse(pickupAt) - 45 * 60_000;
@@ -192,6 +205,13 @@ if (process.env.WALK_STAFF_PIN) {
   await page.waitForURL(/\/checkout$/);
   await page.waitForTimeout(800);
   expect((await page.locator('[data-line]').count()) > 0, 'Order again fills the bag and opens checkout');
+  const reordered = await page.evaluate(() => localStorage.getItem('cjt.bag.v1'));
+  await page.goBack({waitUntil: 'networkidle'});
+  await settle();
+  await page.getByRole('button', {name: /^Order again: /}).click();
+  await page.waitForURL(/\/checkout$/);
+  await page.waitForTimeout(800);
+  expect((await page.evaluate(() => localStorage.getItem('cjt.bag.v1'))) === reordered, 'a second Order again does not double the bag');
   await screen('checkout-order-again');
 }
 
