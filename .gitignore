@@ -13,3 +13,17 @@ exports
 
 # Production secrets for the first `cf deploy --secrets-file`; deleted after deploy.
 .prod.vars
+
+# Secrets and local state, whatever their name
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/
+.mcp.json
+
+# OS and editor noise
+.DS_Store
+*.log

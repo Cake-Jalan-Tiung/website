@@ -68,7 +68,7 @@ describe('the typeset wordmark', () => {
 
 describe('the Astryx theme settings', () => {
   // The editor owns cjt.settings.json and stores colours as literals, so they are held to tokens.ts here.
-  // The one exception: Astryx refused #767676 as secondary text on its muted surfaces (README, Decisions).
+  // The one exception: Astryx refused #767676 as secondary text on its muted surfaces (docs/design-system.md, Decisions).
   const astryxSecondary = '#6D6D6D';
   const brand = new Set<string>([...Object.values(color), astryxSecondary]);
   const used = [...new Set([...themeSettings.matchAll(/#[0-9a-f]{6}/gi)].map(([hex]) => hex.toUpperCase()))];
