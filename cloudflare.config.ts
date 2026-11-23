@@ -24,8 +24,10 @@ export default defineConfig({
       ALERT_EMAIL: bindings.sendEmail({allowedSenderAddresses: ['alerts@hazli.dev']}),
       ALERT_TO: bindings.secret(),
     },
-    // The shop's own address; the workers.dev address keeps working beside it.
+    // The shop's own address. workers.dev stays on beside it: payments started there return
+    // there, and links to it keep working.
     domains: ['cakejalantiung.app', 'www.cakejalantiung.app'],
+    workersDev: true,
     // Every 5 minutes: settle orders still waiting for payment, and keep StoreHub in step (src/ops/scheduled.server.ts).
     triggers: [triggers.scheduled({schedule: '*/5 * * * *'})],
   },
