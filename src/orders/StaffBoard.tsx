@@ -3,14 +3,18 @@
 import {useEffect, useRef, useState} from 'react';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Button} from '@astryxdesign/core/Button';
+import {Switch} from '@astryxdesign/core/Switch';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {storefront} from '../site/content';
 import {Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {formatShopTime} from '../storefront/hours';
 import {Sections} from '../storefront/sections';
-import {advanceOrder, getStaffBoard, staffLogin, staffLogout, type StaffOrder} from './functions';
-import {KITCHEN_COLUMNS, kitchenNext, formatRM} from './model';
+import {advanceOrder, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffOrder} from './functions';
+import {showAvailability, useAvailability} from './availability-store';
+import type {CloseFor} from './availability';
+import {KITCHEN_COLUMNS, TEST_DISH, kitchenNext, formatRM} from './model';
+import {bag} from './bag';
 import s from './orders.module.css';
 
 const POLL_MS = 5000;
@@ -84,6 +88,59 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
       </Row>
       {error ? <Banner status="error" title={error} /> : null}
     </article>
+  );
+}
+
+/** Pause online ordering, and mark dishes sold out for the rest of the day. */
+function Availability() {
+  const availability = useAvailability();
+  const [error, setError] = useState<string | null>(null);
+  const change = async (data: {dishId?: string; closeFor: CloseFor | 'open'}) => {
+    const result = await setAvailability({data});
+    if (result.ok) showAvailability(result.availability);
+    setError(result.ok ? null : result.message);
+  };
+  const paused = availability.ordersPaused;
+  return (
+    <section className={s.column} aria-labelledby="availability">
+      <Stack gap="md">
+        <Type role="subhead" as="h2" id="availability">Online ordering</Type>
+        {paused ? (
+          <Stack gap="sm">
+            <Banner
+              status="warning"
+              title={paused.until ? 'Paused for the rest of today' : 'Paused until you resume'}
+              description="Customers can see the menu but cannot order. Orders already paid stay on the board."
+            />
+            <Button variant="primary" label="Resume online orders" clickAction={() => change({closeFor: 'open'})} />
+          </Stack>
+        ) : (
+          <Row gap="sm">
+            <Button variant="secondary" label="Pause for today" clickAction={() => change({closeFor: 'today'})} />
+            <Button variant="secondary" label="Pause until I resume" clickAction={() => change({closeFor: 'until-reopened'})} />
+          </Row>
+        )}
+        <Type role="subhead" as="h3">Sold out today</Type>
+        <Type role="body" ink="secondary">A dish switched on here cannot be ordered online until tomorrow.</Type>
+        <Columns count={3} gap="md" align="start">
+          {storefront.categories.map((category) => (
+            <Stack key={category.id} gap="sm">
+              <Type role="label" as="h4">{category.name}</Type>
+              {category.dishes.map((dish) => (
+                <Switch
+                  key={dish.id}
+                  size="sm"
+                  label={dish.name}
+                  value={availability.soldOut[dish.id] !== undefined}
+                  changeAction={(checked) => change({dishId: dish.id, closeFor: checked ? 'today' : 'open'})}
+                />
+              ))}
+            </Stack>
+          ))}
+        </Columns>
+        {error ? <Banner status="error" title={error} /> : null}
+      </Stack>
+    </section>
   );
 }
 
@@ -166,6 +223,11 @@ export function StaffBoard({initial}: {initial: StaffOrder[] | null}) {
             ) : (
               <Button variant="primary" label="Turn on sound" onClick={() => { const context = new AudioContext(); ring(context); setSound(context); }} />
             )}
+            <Button
+              variant="secondary"
+              label={`Test order (${formatRM(Math.round(TEST_DISH.price * 100))})`}
+              onClick={() => { bag.clear(); bag.set(TEST_DISH.id, 1); window.location.assign('/checkout'); }}
+            />
             <Button variant="ghost" label="Sign out" clickAction={async () => { await staffLogout(); setOrders(null); }} />
           </Row>
         </Row>
@@ -192,6 +254,7 @@ export function StaffBoard({initial}: {initial: StaffOrder[] | null}) {
           })}
         </Columns>
         <Type role="caption" ink="secondary">{collected} collected today.</Type>
+        <Availability />
       </Stack>
     </Sections>
   );

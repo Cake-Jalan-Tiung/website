@@ -7,13 +7,17 @@ import {storefront} from '../site/content';
 import {isRecord, textAt} from '../lib/guards';
 import {startOfShopDay} from '../storefront/hours';
 import {paymentProvider} from '../payments/select.server';
+import {alertLater} from '../ops/alert.server';
 import type {PaymentMethod, PaymentState} from '../payments/provider';
-import {CartError, KITCHEN_STATUSES, kitchenNext, parseCustomer, paymentDueAt, priceCart, servingWindow, statusForPayment, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import {CartError, KITCHEN_STATUSES, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, settledStatus, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import {isOpenSlot, pickupSlots, type Slot} from './pickup';
-import {ordersRepo, staffAttempts, type OrderRow} from './repo.server';
+import {closuresRepo, ordersRepo, staffAttempts, type OrderRow} from './repo.server';
+import {ORDERS_SUBJECT, assertAvailable, availabilityFrom, closureEnds, dishSubject, parseCloseFor, type Availability} from './availability';
 import {STAFF_COOKIE, STAFF_SESSION_DAYS, isStaffToken, issueStaffToken, sameSecret} from './staff-session.server';
 
 const repo = () => ordersRepo(env.DB, env.SHOP_ID);
+const closures = () => closuresRepo(env.DB, env.SHOP_ID);
+const readAvailability = async (now: Date) => availabilityFrom(await closures().all(), now);
 const provider = () => paymentProvider(env);
 
 /** A validator that reads one string field. */
@@ -30,7 +34,11 @@ function parseCart(value: unknown): CartLine[] {
 type Result<T> = ({ok: true} & T) | {ok: false; message: string};
 const failure = (error: unknown): {ok: false; message: string} => {
   if (error instanceof CartError) return {ok: false, message: error.message};
-  console.error(error);
+  alertLater({
+    key: 'checkout-error',
+    subject: 'Checkout failed for a customer',
+    body: `A customer saw "Something went wrong" at checkout: ${String(error)}\n\nIf this repeats, customers cannot order. Check the Worker's logs and whether CHIP is reachable.`,
+  });
   return {ok: false, message: 'Something went wrong on our side. Nothing was charged; please try again.'};
 };
 
@@ -41,7 +49,8 @@ export const getCheckoutOptions = createServerFn({method: 'POST'})
   .validator((input: unknown) => parseCart(isRecord(input) ? input.cart : undefined))
   .handler(async ({data: cart}): Promise<Result<CheckoutOptions>> => {
     try {
-      const priced = priceCart(storefront, cart);
+      const priced = priceCart(storefront, cart, {allowTest: await isStaff()});
+      assertAvailable(storefront, cart, await readAvailability(new Date()));
       const window = servingWindow(storefront, cart);
       return {
         ok: true,
@@ -67,7 +76,8 @@ export const placeOrder = createServerFn({method: 'POST'})
     try {
       const now = new Date();
       const payments = provider();
-      const cart = priceCart(storefront, data.cart);
+      const cart = priceCart(storefront, data.cart, {allowTest: await isStaff()});
+      assertAvailable(storefront, data.cart, await readAvailability(now));
       const customer = parseCustomer(data.customer);
       if (!isOpenSlot(storefront, now, data.pickupAt, servingWindow(storefront, data.cart)?.span)) {
         throw new CartError('That pick-up time has just gone. Choose another.');
@@ -100,6 +110,29 @@ export const placeOrder = createServerFn({method: 'POST'})
     }
   });
 
+/** What can be ordered right now: whether online ordering is paused, and which dishes are sold out. */
+export const getAvailability = createServerFn({method: 'GET'}).handler(async (): Promise<Availability> => readAvailability(new Date()));
+
+/** Staff close or open online ordering, or one dish. */
+export const setAvailability = createServerFn({method: 'POST'})
+  .validator((input: unknown) => {
+    const dishId = textAt(input, 'dishId');
+    const closeFor = textAt(input, 'closeFor');
+    return {
+      subject: dishId ? dishSubject(dishId) : ORDERS_SUBJECT,
+      dishId,
+      closeFor: parseCloseFor(closeFor),
+    };
+  })
+  .handler(async ({data}): Promise<Result<{availability: Availability}>> => {
+    if (!(await isStaff())) return {ok: false, message: 'Signed out. Enter the PIN again.'};
+    if (data.dishId && !orderableDish(storefront, data.dishId)) return {ok: false, message: 'That dish is not on the menu.'};
+    const now = new Date();
+    if (data.closeFor) await closures().close(data.subject, closureEnds(storefront, data.closeFor, now), now);
+    else await closures().open(data.subject);
+    return {ok: true, availability: await readAvailability(now)};
+  });
+
 export type PublicOrder = {
   id: string;
   code: string;
@@ -112,7 +145,7 @@ export type PublicOrder = {
 
 const toPublic = (order: OrderRow): PublicOrder => ({
   id: order.id,
-  code: order.id.slice(0, 6).toUpperCase(),
+  code: orderCode(order.id),
   status: order.status,
   pickupAt: order.pickupAt,
   firstName: order.customer.name.split(/\s+/)[0],
@@ -141,8 +174,7 @@ export const getOrder = createServerFn({method: 'GET'})
       return toPublic(order);
     }
     const now = new Date();
-    const fromProvider = statusForPayment(state);
-    const to = fromProvider === 'paid' || now < paymentDueAt(order.createdAt) ? fromProvider : 'expired';
+    const to = settledStatus(state, order.createdAt, now);
     if (to && (await orders.move(id, to, now))) return toPublic({...order, status: to});
     return toPublic(order);
   });

@@ -12,7 +12,7 @@ import {Type} from '../system/Type';
 import {dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
 import {formatSpan, shopClock} from './hours';
 import {photoFor} from './photos';
-import {AddToBag, BagButton} from './bag';
+import {AddToBag, BagButton, PausedNotice} from './bag';
 import s from './storefront.module.css';
 
 /** The passing line over the header: what is true this week, on ink. */
@@ -54,6 +54,7 @@ export function StoreHeader({store}: {store: Storefront}) {
           <BagButton store={store} />
         </div>
       </Field>
+      <PausedNotice />
     </>
   );
 }

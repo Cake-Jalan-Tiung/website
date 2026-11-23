@@ -5,3 +5,7 @@ CHIP_BRAND_ID=
 CHIP_SECRET_KEY=
 STAFF_PIN=246810
 SESSION_SECRET=generate-with-openssl-rand-hex-32
+# StoreHub API token. Sales are sent to StoreHub only when PAYMENTS=chip, so local work never writes there.
+STOREHUB_API_TOKEN=
+# Where failure alerts are emailed. Empty: alerts only go to the log.
+ALERT_TO=

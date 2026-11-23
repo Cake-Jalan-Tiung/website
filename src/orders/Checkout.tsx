@@ -12,12 +12,11 @@ import {textAt} from '../lib/guards';
 import {AddToBag} from '../storefront/bag';
 import {photoFor} from '../storefront/photos';
 import {Sections, StoreHeader} from '../storefront/sections';
-import {dishIndex} from '../storefront/model';
 import {formatSpan} from '../storefront/hours';
 import {Columns, Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {useBag, useBagReady} from './bag';
-import {formatRM, type Customer} from './model';
+import {formatRM, orderableDish, type Customer} from './model';
 import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
 import type {PaymentMethod} from '../payments/provider';
 import s from './orders.module.css';
@@ -223,7 +222,7 @@ export function Checkout() {
               <Type role="subhead" as="h2" id="bag">Your order</Type>
               <ul className={s.lines}>
                 {lines.map((line) => {
-                  const dish = dishIndex(storefront).get(line.dishId);
+                  const dish = orderableDish(storefront, line.dishId);
                   if (!dish) return null;
                   const photo = photoFor(dish.id);
                   const priced = options?.cart.lines.find((l) => l.dishId === line.dishId);

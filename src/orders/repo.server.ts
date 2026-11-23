@@ -1,7 +1,9 @@
 // Orders in D1. Every status change is one guarded UPDATE (`WHERE status IN <allowed from>`),
 // so a repeated or late event changes nothing instead of moving an order backwards.
-import {KITCHEN_STATUSES, ORDER_STATUSES, allowedFrom, statusForPayment, type Customer, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import {KITCHEN_STATUSES, ORDER_STATUSES, SOLD_STATUSES, TEST_DISH, allowedFrom, statusForPayment, type Customer, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import type {ConfirmedEvent} from '../payments/provider';
+import type {PosSale} from '../pos/sale';
+import type {ClosureRow} from './availability';
 
 export type OrderRow = {
   id: string;
@@ -109,6 +111,50 @@ export function ordersRepo(db: D1Database, shopId: string) {
       if (to) await move(event.orderId, to, now);
       return true;
     },
+
+    /** Orders still waiting for payment, oldest first: what the scheduled sweep settles. */
+    async awaitingPayment(limit: number): Promise<{id: string; purchaseId: string | null; createdAt: string}[]> {
+      const rows = await db
+        .prepare(`SELECT id, purchase_id, created_at FROM orders WHERE shop_id = ? AND status = 'awaiting_payment' ORDER BY created_at LIMIT ?`)
+        .bind(shopId, limit)
+        .all<{id: string; purchase_id: string | null; created_at: string}>();
+      return rows.results.map((row) => ({id: row.id, purchaseId: row.purchase_id, createdAt: row.created_at}));
+    },
+
+    /** Sold orders not yet recorded in the POS, oldest payment first. */
+    async posUnrecorded(limit: number): Promise<PosSale[]> {
+      // Staff test orders are real payments but not sales.
+      const where = `shop_id = ? AND status IN (${placeholders(SOLD_STATUSES)}) AND paid_at IS NOT NULL AND pos_recorded_at IS NULL
+        AND id NOT IN (SELECT order_id FROM order_items WHERE dish_id = ?)`;
+      const binds = [shopId, ...SOLD_STATUSES, TEST_DISH.id];
+      const [orders, items] = await Promise.all([
+        db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen FROM orders WHERE ${where} ORDER BY paid_at LIMIT ?`).bind(...binds, limit)
+          .all<{id: string; paid_at: string; pickup_at: string; payment_method: string; total_sen: number}>(),
+        db.prepare(`SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE ${where} ORDER BY paid_at LIMIT ?)`).bind(...binds, limit).all<ItemRecord>(),
+      ]);
+      return orders.results.map((order) => ({
+        orderId: order.id,
+        paidAt: order.paid_at,
+        pickupAt: order.pickup_at,
+        paymentMethod: order.payment_method,
+        totalSen: order.total_sen,
+        items: items.results.filter((item) => item.order_id === order.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
+      }));
+    },
+
+    /** Refunded orders whose POS sale has not been cancelled yet. */
+    async posUncancelled(limit: number): Promise<string[]> {
+      const rows = await db
+        .prepare(`SELECT id FROM orders WHERE shop_id = ? AND status = 'refunded' AND pos_recorded_at IS NOT NULL AND pos_cancelled_at IS NULL ORDER BY updated_at LIMIT ?`)
+        .bind(shopId, limit)
+        .all<{id: string}>();
+      return rows.results.map((row) => row.id);
+    },
+
+    async markPos(id: string, step: 'recorded' | 'cancelled', at: Date) {
+      const column = step === 'recorded' ? 'pos_recorded_at' : 'pos_cancelled_at';
+      await db.prepare(`UPDATE orders SET ${column} = ? WHERE id = ? AND shop_id = ?`).bind(at.toISOString(), id, shopId).run();
+    },
   };
 }
 
@@ -128,6 +174,25 @@ export function staffAttempts(db: D1Database) {
         db.prepare('INSERT INTO staff_login_failures (ip, at) VALUES (?, ?)').bind(ip, now.toISOString()),
         db.prepare('DELETE FROM staff_login_failures WHERE at < ?').bind(keepSince.toISOString()),
       ]);
+    },
+  };
+}
+
+/** What staff have closed: online ordering, or single dishes. Rows past their `until` are ignored on read. */
+export function closuresRepo(db: D1Database, shopId: string) {
+  return {
+    async all(): Promise<ClosureRow[]> {
+      const rows = await db.prepare('SELECT subject, until FROM closures WHERE shop_id = ?').bind(shopId).all<ClosureRow>();
+      return rows.results;
+    },
+    async close(subject: string, until: string | null, now: Date) {
+      await db
+        .prepare('INSERT INTO closures (shop_id, subject, until, closed_at) VALUES (?, ?, ?, ?) ON CONFLICT (shop_id, subject) DO UPDATE SET until = excluded.until, closed_at = excluded.closed_at')
+        .bind(shopId, subject, until, now.toISOString())
+        .run();
+    },
+    async open(subject: string) {
+      await db.prepare('DELETE FROM closures WHERE shop_id = ? AND subject = ?').bind(shopId, subject).run();
     },
   };
 }

@@ -1,0 +1,58 @@
+import {describe, expect, it} from 'vitest';
+import {storefront} from '../site/content';
+import {storehub} from '../site/pos';
+import {dishIndex} from '../storefront/model';
+import {storehubTransaction, type PosSale} from './sale';
+
+const shop = {storeId: storehub.storeId, products: storehub.products, timeZone: storefront.timeZone};
+
+const sale: PosSale = {
+  orderId: '991e3b40-0387-4f99-95c6-9c30ffb1a8f0',
+  paidAt: '2026-11-23T10:16:02.303Z',
+  pickupAt: '2026-11-24T00:00:00.000Z',
+  paymentMethod: 'fpx',
+  totalSen: 900 + 2 * 1950,
+  items: [
+    {dishId: 'croissant', name: 'Croissant', unitSen: 900, quantity: 1},
+    {dishId: 'iced-ajisai-matcha-latte', name: 'Iced Ajisai 2.0 Matcha Latte', unitSen: 1950, quantity: 2},
+  ],
+};
+
+describe('storehubTransaction', () => {
+  it('records what the customer paid, in ringgit, against the StoreHub products', () => {
+    const transaction = storehubTransaction(sale, shop);
+    expect(transaction).toMatchObject({
+      refId: sale.orderId,
+      invoiceNumber: 'WEB-991E3B',
+      storeId: '560ce27f0ce34105ab775d52',
+      transactionType: 'Sale',
+      transactionTime: sale.paidAt,
+      paymentMethod: 'CreditCard',
+      total: 48,
+      subTotal: 48,
+      discount: 0,
+    });
+    expect(transaction.items).toEqual([
+      {productId: '602b358b83bf530006d0e546', quantity: 1, unitPrice: 9, subTotal: 9, total: 9, tax: 0, discount: 0},
+      {productId: '683fe999d7c0ce00083fcfe5', quantity: 2, unitPrice: 19.5, subTotal: 39, total: 39, tax: 0, discount: 0},
+    ]);
+    // StoreHub only knows Cash or CreditCard, so the real method and the pick-up time go in the comment.
+    expect(transaction.comment).toBe('Web order 991E3B, paid online (fpx), pick-up Tomorrow, 8am');
+  });
+
+  it('refuses a dish with no StoreHub product rather than record a wrong sale', () => {
+    expect(() => storehubTransaction({...sale, items: [{dishId: 'not-mapped', name: 'X', unitSen: 100, quantity: 1}]}, shop)).toThrow(/not-mapped/);
+  });
+});
+
+describe('StoreHub products', () => {
+  it('covers every dish on the menu, and nothing that is not on it', () => {
+    const menu = [...dishIndex(storefront).keys()].sort();
+    expect(Object.keys(storehub.products).sort()).toEqual(menu);
+  });
+
+  it('maps no two dishes to one product', () => {
+    const ids = Object.values(storehub.products);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

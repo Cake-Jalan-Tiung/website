@@ -1,6 +1,6 @@
 // What an order is, independent of storage and payment: a priced cart, who collects it and
 // when, and a status that only moves forward. Money is integer sen everywhere.
-import {dishIndex, type Storefront} from '../storefront/model';
+import {dishIndex, type Dish, type Storefront} from '../storefront/model';
 import {toMinutes, type Span} from '../storefront/hours';
 import type {PaymentState} from '../payments/provider';
 import {textAt} from '../lib/guards';
@@ -20,6 +20,16 @@ export type PricedCart = {lines: PricedLine[]; totalSen: number};
 
 export class CartError extends Error {}
 
+/**
+ * A RM 1 item that only signed-in staff can order, to try a real payment end to end. It is on
+ * no menu, sits alone in its cart, reaches the kitchen board marked as a test, and never
+ * becomes a POS sale.
+ */
+export const TEST_DISH: Dish = {id: 'staff-test', name: 'TEST order, do not make', price: 1};
+
+/** A dish that can be in a bag: anything on the menu, and the staff test item. */
+export const orderableDish = (store: Storefront, id: string): Dish | undefined => (id === TEST_DISH.id ? TEST_DISH : dishIndex(store).get(id));
+
 /** 5450 → "RM 54.50": checkout, receipts and the kitchen always show the currency and two decimals. */
 export const formatRM = (sen: number) => `RM ${(sen / 100).toFixed(2)}`;
 
@@ -28,11 +38,15 @@ export const formatRM = (sen: number) => `RM ${(sen / 100).toFixed(2)}`;
  * tampered price cannot reach an order. Throws on anything that is not a real, sane cart.
  * Catalogue prices are in ringgit as the platform lists them; this is where they become sen.
  */
-export function priceCart(store: Storefront, cart: readonly CartLine[]): PricedCart {
+export function priceCart(store: Storefront, cart: readonly CartLine[], {allowTest = false} = {}): PricedCart {
   if (cart.length === 0) throw new CartError('The bag is empty.');
+  if (cart.some((line) => line.dishId === TEST_DISH.id)) {
+    if (!allowTest) throw new CartError('The test order is for signed-in staff. Sign in at /staff first.');
+    if (cart.length > 1) throw new CartError('A test order holds only the test item. Remove the rest.');
+  }
   const seen = new Set<string>();
   const lines = cart.map(({dishId, quantity}) => {
-    const dish = dishIndex(store).get(dishId);
+    const dish = orderableDish(store, dishId);
     if (!dish) throw new CartError('Something in the bag is no longer on the menu.');
     if (seen.has(dishId)) throw new CartError('A dish appears twice in the bag.');
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) throw new CartError(`Quantities run from 1 to ${MAX_QUANTITY}.`);
@@ -124,6 +138,12 @@ export const KITCHEN_COLUMNS = ORDER_STATUSES.flatMap((status) => {
 export const KITCHEN_STATUSES = KITCHEN_COLUMNS.map((column) => column.status);
 export const kitchenNext = (status: OrderStatus) => KITCHEN_COLUMNS.find((column) => column.status === status)?.next;
 
+/** Orders whose money is in and not given back: what the shop has sold. */
+export const SOLD_STATUSES = ['paid', 'accepted', 'ready', 'collected'] as const satisfies readonly OrderStatus[];
+
+/** The short code the customer and the counter use for an order. */
+export const orderCode = (id: string) => id.slice(0, 6).toUpperCase();
+
 /** What a payment provider's state means for an order; null when it changes nothing. */
 export function statusForPayment(state: PaymentState): OrderStatus | null {
   if (state === 'paid') return 'paid';
@@ -131,6 +151,15 @@ export function statusForPayment(state: PaymentState): OrderStatus | null {
   if (state === 'expired') return 'expired';
   if (state === 'failed') return 'cancelled';
   return null;
+}
+
+/**
+ * Where an unpaid order goes once the provider has been asked: paid whenever the money is in,
+ * expired once its payment window has passed without it, otherwise wherever the provider says.
+ */
+export function settledStatus(state: PaymentState, createdAt: string, now: Date): OrderStatus | null {
+  const fromProvider = statusForPayment(state);
+  return fromProvider === 'paid' || now < paymentDueAt(createdAt) ? fromProvider : 'expired';
 }
 
 // Customers ----------------------------------------------------------------------------------

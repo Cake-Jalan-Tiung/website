@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
-import {CartError, PAYMENT_WINDOW_MINUTES, canMove, parseCustomer, priceCart, servingWindow} from './model';
+import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
 import {isOpenSlot, pickupSlots} from './pickup';
 
@@ -103,5 +103,25 @@ describe('parseBag', () => {
   it('reads garbage as an empty bag', () => {
     expect(parseBag('not json')).toEqual([]);
     expect(parseBag('{"a":1}')).toEqual([]);
+  });
+});
+
+describe('the staff test order', () => {
+  const test = [{dishId: TEST_DISH.id, quantity: 1}];
+
+  it('costs RM 1 for signed-in staff', () => {
+    expect(priceCart(storefront, test, {allowTest: true}).totalSen).toBe(100);
+  });
+
+  it('is refused for anyone else', () => {
+    expect(() => priceCart(storefront, test)).toThrow(CartError);
+  });
+
+  it('cannot share a cart with real dishes', () => {
+    expect(() => priceCart(storefront, [...test, {dishId: 'croissant', quantity: 1}], {allowTest: true})).toThrow(CartError);
+  });
+
+  it('is on no menu', () => {
+    expect(storefront.categories.some((category) => category.dishes.some((dish) => dish.id === TEST_DISH.id))).toBe(false);
   });
 });
