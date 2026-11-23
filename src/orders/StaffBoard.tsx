@@ -23,18 +23,24 @@ const POLL_MS = 5000;
 const COUNTDOWN_MINUTES = 90;
 const isNewStatus = (order: StaffOrder) => order.status === KITCHEN_COLUMNS[0].status;
 
-/** Three short tones, loud enough to hear over a kitchen. Needs one tap first: browsers block sound until then. */
-function ring(context: AudioContext) {
-  [0, 0.35, 0.7].forEach((start) => {
+/**
+ * Short tones, loud enough to hear over a kitchen: three high ones for a new order, two falling
+ * ones for a customer at the counter, so staff know which without looking. Needs one tap first:
+ * browsers block sound until then.
+ */
+function ring(context: AudioContext, kind: 'order' | 'arrival' = 'order', delay = 0) {
+  const tones = kind === 'order' ? [[0, 880], [0.35, 880], [0.7, 880]] : [[0, 660], [0.4, 523]];
+  tones.forEach(([start, pitch]) => {
     const tone = context.createOscillator();
     const gain = context.createGain();
-    tone.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, context.currentTime + start);
-    gain.gain.exponentialRampToValueAtTime(0.6, context.currentTime + start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + start + 0.3);
+    tone.frequency.value = pitch;
+    const at = context.currentTime + delay + start;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.6, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
     tone.connect(gain).connect(context.destination);
-    tone.start(context.currentTime + start);
-    tone.stop(context.currentTime + start + 0.32);
+    tone.start(at);
+    tone.stop(at + 0.32);
   });
 }
 
@@ -237,7 +243,9 @@ export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
     placed.forEach((o) => rung.current.add(o.id));
     const walkedIn = nextOrders.filter((o) => o.arrivedAt && !greeted.current.has(o.id));
     walkedIn.forEach((o) => greeted.current.add(o.id));
-    if ((placed.length > 0 || walkedIn.length > 0) && soundRef.current) ring(soundRef.current);
+    if (soundRef.current && placed.length > 0) ring(soundRef.current, 'order');
+    // After a new order's tones, so the two never sound as one.
+    if (soundRef.current && walkedIn.length > 0) ring(soundRef.current, 'arrival', placed.length > 0 ? 1.2 : 0);
   };
 
   const signedIn = board !== null;

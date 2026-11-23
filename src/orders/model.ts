@@ -140,6 +140,16 @@ export const KITCHEN_COLUMNS = ORDER_STATUSES.flatMap((status) => {
 export const KITCHEN_STATUSES = KITCHEN_COLUMNS.map((column) => column.status);
 export const kitchenNext = (status: OrderStatus) => KITCHEN_COLUMNS.find((column) => column.status === status)?.next;
 
+/**
+ * When "I'm here" can be said: while the kitchen has the order, once it is ready or within this
+ * many minutes of its pick-up time. Any earlier, a tap at home would ring the kitchen for nothing.
+ * The server holds the same rule, so the button is only a convenience.
+ */
+export const ARRIVAL_OPENS_MINUTES = 10;
+export const arrivalOpensAt = (pickupAt: string) => new Date(Date.parse(pickupAt) - ARRIVAL_OPENS_MINUTES * 60_000);
+export const canArrive = (status: OrderStatus, pickupAt: string, now: Date) =>
+  KITCHEN_STATUSES.includes(status) && (status === 'ready' || now >= arrivalOpensAt(pickupAt));
+
 /** Orders whose money is in and not given back: what the shop has sold. */
 export const SOLD_STATUSES = ['paid', 'accepted', 'ready', 'collected'] as const satisfies readonly OrderStatus[];
 

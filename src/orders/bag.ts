@@ -98,34 +98,53 @@ export const bag = {
 
 export const countOf = (cart: readonly CartLine[]) => cart.reduce((sum, line) => sum + line.quantity, 0);
 
-// The orders this bag has gone to pay for. The bag empties when one of them is paid, and only
-// then: an order page opened later, for an older order or from another tab, never touches a bag
-// the customer is building now.
+// The orders this bag has gone to pay for, each with the bag as it left. When one of them is
+// paid the bag empties, but only if it is still that bag: one the customer has changed since is
+// their next order. An order page opened later, for an older order or in another tab, never
+// touches a bag being built now.
 const PAYING_KEY = 'cjt.paying.v1';
 /** Retries of a failed payment each make an order; a few are kept, as any of them may be the one paid. */
 const PAYING_KEPT = 5;
+type Paying = {id: string; lines: readonly CartLine[]};
 
-function readPaying(): string[] {
+function readPaying(): Paying[] {
+  let value: unknown;
   try {
-    const value: unknown = JSON.parse(window.localStorage.getItem(PAYING_KEY) ?? '[]');
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+    value = JSON.parse(window.localStorage.getItem(PAYING_KEY) ?? '[]');
   } catch {
     return [];
   }
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry: unknown) =>
+    typeof entry === 'object' && entry !== null && 'id' in entry && typeof entry.id === 'string' && 'lines' in entry ? [{id: entry.id, lines: parseLines(entry.lines)}] : [],
+  );
 }
 
-/** Checkout calls this as the bag leaves to be paid for as `orderId`. */
-export function payingFor(orderId: string) {
-  window.localStorage.setItem(PAYING_KEY, JSON.stringify([orderId, ...readPaying().filter((id) => id !== orderId)].slice(0, PAYING_KEPT)));
+const writePaying = (entries: readonly Paying[]) =>
+  entries.length > 0 ? window.localStorage.setItem(PAYING_KEY, JSON.stringify(entries.slice(0, PAYING_KEPT))) : window.localStorage.removeItem(PAYING_KEY);
+
+const sameLines = (a: readonly CartLine[], b: readonly CartLine[]) =>
+  a.length === b.length && a.every((line) => b.some((other) => other.dishId === line.dishId && other.quantity === line.quantity));
+
+/** Checkout calls this as `lines` leave to be paid for as `orderId`. */
+export function payingFor(orderId: string, lines: readonly CartLine[]) {
+  writePaying([{id: orderId, lines}, ...readPaying().filter((entry) => entry.id !== orderId)]);
 }
+
+/** Orders this device has gone to pay for and not yet heard were paid. */
+export const payingIds = () => (typeof window === 'undefined' ? [] : readPaying().map((entry) => entry.id));
+
+/** Stops waiting on an order that will not be paid. */
+export const forgetPaying = (orderId: string) => writePaying(readPaying().filter((entry) => entry.id !== orderId));
 
 /**
- * The order page calls this once `orderId` is paid: if this bag went to pay for it, the bag has
- * done its job and empties. True only then, the moment this device has just paid for it.
+ * Called once `orderId` is paid. True when this device went to pay for it: the wait is over, and
+ * the bag empties if it is still the bag that was paid for.
  */
 export function settleBag(orderId: string): boolean {
-  if (!readPaying().includes(orderId)) return false;
-  window.localStorage.removeItem(PAYING_KEY);
-  bag.clear();
+  const entry = readPaying().find((paying) => paying.id === orderId);
+  if (!entry) return false;
+  writePaying([]);
+  if (sameLines(load(), entry.lines)) bag.clear();
   return true;
 }

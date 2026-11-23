@@ -103,6 +103,8 @@ await offered.click();
 await page.waitForTimeout(600);
 expect((await page.locator('[data-line]').allTextContents()).some((line) => offeredName && line.includes(offeredName)), 'an add-on joins the bag');
 expect((await addOns.getByRole('button', {name: `Add ${offeredName} to bag`}).count()) === 0, 'an added add-on leaves the row');
+expect(await page.evaluate(() => document.activeElement?.closest('[data-line]') !== null), 'focus follows an added add-on into the bag');
+expect(/^Pay RM/.test((await page.getByRole('button', {name: /^(Pay|Updating)/}).textContent()) ?? ''), 'Pay shows the total for the bag as it is now');
 await screen('checkout-add-on');
 await page.getByRole('button', {name: /^Pay/}).click();
 await page.waitForTimeout(800);
@@ -156,20 +158,10 @@ await page.evaluate(() => localStorage.removeItem('cjt.bag.v1'));
 await page.reload({waitUntil: 'networkidle'});
 await settle();
 await screen('home-tracking');
-// I'm here opens near the pick-up time, so a tap at home cannot ring the kitchen.
-const arrivalOpen = Date.now() >= Date.parse(pickupAt) - 45 * 60_000;
+// I'm here opens near the pick-up time or once the order is ready, so a tap at home cannot ring the kitchen.
 await page.goto(orderUrl, {waitUntil: 'networkidle'});
 await settle();
-expect(arrivalOpen || (await page.getByRole('button', {name: 'I’m here'}).count()) === 0, 'I’m here waits for the pick-up time to come near');
-// At the shop, ten minutes before pick-up: I'm here tells the counter.
-await page.clock.setFixedTime(new Date(Date.parse(pickupAt) - 10 * 60_000));
-await page.goto(orderUrl, {waitUntil: 'networkidle'});
-await settle();
-await page.getByRole('button', {name: 'I’m here'}).click();
-await page.waitForTimeout(800);
-expect((await page.getByRole('status').filter({hasText: 'The counter knows you’re here'}).count()) === 1, 'I’m here is acknowledged in a status');
-expect(await page.getByRole('status').evaluate((el) => el === document.activeElement), 'focus moves to the acknowledgement');
-await screen('order-arrived');
+expect((await page.getByRole('button', {name: 'I’m here'}).count()) === 0, 'I’m here waits until pick-up is near or the order is ready');
 
 if (process.env.WALK_STAFF_PIN) {
   const code = orderCode;
@@ -181,13 +173,19 @@ if (process.env.WALK_STAFF_PIN) {
     await staff.waitForTimeout(1500);
   }
   const ticket = staff.getByRole('article', {name: new RegExp(`^Order ${code} `)});
-  expect((await ticket.getByText(/^Customer is here · since /).count()) === 1, 'the kitchen sees the customer has arrived');
-  await staff.screenshot({path: `${out}/staff-arrived.png`});
   await ticket.getByRole('button', {name: 'Accept'}).click();
   await staff.waitForTimeout(1000);
   await ticket.getByRole('button', {name: 'Mark ready'}).click();
   // The customer's page, left open, follows by itself: no reload.
   expect(await page.waitForFunction(() => document.title.startsWith('Ready to collect'), null, {timeout: 8000}).then(() => true, () => false), 'the open order page turns Ready by itself, title and all');
+  // Ready: I'm here is open, and tells the counter.
+  await page.getByRole('button', {name: 'I’m here'}).click();
+  await page.waitForTimeout(800);
+  expect((await page.getByRole('status').filter({hasText: 'The counter knows you’re here'}).count()) === 1, 'I’m here is acknowledged in a status');
+  expect(await page.getByRole('status').evaluate((el) => el === document.activeElement), 'focus moves to the acknowledgement');
+  await screen('order-arrived');
+  expect(await ticket.getByText(/^Customer is here · since /).waitFor({timeout: 8000}).then(() => true, () => false), 'the kitchen sees the customer has arrived');
+  await staff.screenshot({path: `${out}/staff-arrived.png`});
   await screen('order-ready');
   await ticket.getByRole('button', {name: 'Collected'}).click();
   await staff.waitForTimeout(1000);

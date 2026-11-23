@@ -4,7 +4,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {Link} from '@astryxdesign/core/Link';
 import {storefront} from '../site/content';
-import {formatShopTime} from '../storefront/hours';
 import {Cta} from '../storefront/bag';
 import {StoreHeader} from '../storefront/sections';
 import {Field} from '../system/Field';
@@ -16,14 +15,13 @@ import {bag, settleBag} from './bag';
 import {useAvailability} from './availability-store';
 import {OrderTotal} from './Checkout';
 import {arriveForOrder, getOrder, type PublicOrder} from './functions';
-import {CUSTOMER_STEPS, customerCopy, formatRM, isDormant, isFinished, type OrderStatus} from './model';
+import {CUSTOMER_STEPS, arrivalOpensAt, canArrive, customerCopy, formatRM, isDormant, isFinished, type OrderStatus} from './model';
+import {formatShopTime} from '../storefront/hours';
 import {orderAgainLines, rememberOrder} from './recent';
 import {useNow} from '../storefront/now';
 import s from './orders.module.css';
 
 const POLL_MS = 4000;
-/** "I'm here" opens this long before the pick-up time: early enough for a customer who comes early, late enough that a tap at home is unlikely. */
-const ARRIVAL_OPENS_MINUTES = 45;
 /** Expired and cancelled orders are checked only now and then, for a late payment. */
 const DORMANT_POLL_MS = 60_000;
 
@@ -49,7 +47,8 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
   useEffect(() => {
     if (finished) return;
     const timer = window.setInterval(() => {
-      getOrder({data: {id: order.id}}).then((next) => next && setOrder(next));
+      // A poll sent before I'm here can land after it; what the customer has said stays said.
+      getOrder({data: {id: order.id}}).then((next) => next && setOrder((was) => ({...next, arrivedAt: next.arrivedAt ?? was.arrivedAt})));
     }, isDormant(order.status) ? DORMANT_POLL_MS : POLL_MS);
     return () => window.clearInterval(timer);
   }, [order.id, order.status, finished]);
@@ -161,7 +160,9 @@ function Arrival({order, onArrived}: {order: PublicOrder; onArrived: (order: Pub
   const said = useRef<HTMLParagraphElement>(null);
   const now = useNow();
   if (!now) return null;
-  const open = now.getTime() >= Date.parse(order.pickupAt) - ARRIVAL_OPENS_MINUTES * 60_000;
+  const open = canArrive(order.status, order.pickupAt, now);
+  // "today, 7:50am": the day as part of a sentence.
+  const opensAt = formatShopTime(storefront.timeZone, arrivalOpensAt(order.pickupAt).toISOString(), now).replace(/^(Today|Tomorrow)/, (day) => day.toLowerCase());
   const arrive = async () => {
     setBusy(true);
     setFailed(false);
@@ -190,7 +191,7 @@ function Arrival({order, onArrived}: {order: PublicOrder; onArrived: (order: Pub
       </p>
       {order.arrivedAt ? null : (
         <Type role="caption" ink="secondary">
-          {failed ? 'That didn’t go through. Try again, or give your code at the counter.' : open ? 'Tap when you reach the shop, and the counter will know.' : 'When you reach the shop, open this page and tap I’m here.'}
+          {failed ? 'That didn’t go through. Try again, or give your code at the counter.' : open ? 'Tap when you reach the shop, and the counter will know.' : `I’m here opens ${opensAt}, or as soon as your order is ready. Tap it at the shop and the counter will know.`}
         </Type>
       )}
     </Stack>

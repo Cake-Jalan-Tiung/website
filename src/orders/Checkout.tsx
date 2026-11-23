@@ -97,7 +97,8 @@ function AddOns({lines}: {lines: readonly CartLine[]}) {
       <Label ink="secondary" as="h3" id="add-ons">Add to your order</Label>
       <ul className={s.addOnList}>
         {shown.map((dish) => (
-          <li key={dish.id} className={s.addOn}>
+          // Once added the dish leaves this row for the bag above; focus follows it there, to its stepper.
+          <li key={dish.id} className={s.addOn} onClick={() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-line="${dish.id}"] button:last-of-type`)?.focus())}>
             <span className={s.addOnMedia}>
               <Media id={dish.id} alt="" ratio="1 / 1" drawing={dish.drawing} />
               <span className={s.addOnCorner}>
@@ -257,7 +258,7 @@ export function Checkout() {
   };
 
   async function pay() {
-    if (submitting.current) return;
+    if (submitting.current || !pricedNow) return;
     if (!activeSlot) return showStep('when', 'Choose a pick-up time.');
     const found = Object.values(customerProblems(details));
     if (found.length > 0) {
@@ -274,7 +275,7 @@ export function Checkout() {
     try {
       const result = await placeOrder({data: {cart: lines, customer: details, pickupAt: activeSlot.at, method: activeMethod}});
       if (result.ok) {
-        payingFor(result.orderId);
+        payingFor(result.orderId, lines);
         return window.location.assign(result.redirectUrl);
       }
       setError(result.message);
@@ -287,6 +288,14 @@ export function Checkout() {
   }
 
   const problem = error ?? loadError?.message;
+  // Prices follow the bag at once from the unit prices the server gave; Pay waits until the
+  // server has priced exactly this bag, so the amount on it is the amount charged.
+  const unitSen = new Map(options?.cart.lines.map((line) => [line.dishId, line.unitSen]));
+  const shownTotal = lines.every((line) => unitSen.has(line.dishId))
+    ? lines.reduce((sum, line) => sum + (unitSen.get(line.dishId) ?? 0) * line.quantity, 0)
+    : undefined;
+  const pricedNow =
+    options !== null && options.cart.lines.length === lines.length && lines.every((line) => options.cart.lines.some((p) => p.dishId === line.dishId && p.quantity === line.quantity));
 
   return (
     <Shell>
@@ -302,13 +311,13 @@ export function Checkout() {
               const dish = orderableDish(storefront, line.dishId);
               if (!dish) return null;
               const photo = photoFor(dish.id);
-              const priced = options?.cart.lines.find((l) => l.dishId === line.dishId);
+              const unit = unitSen.get(line.dishId);
               return (
                 <li key={line.dishId} className={s.line} data-line={line.dishId}>
                   {photo ? <img src={photo} alt="" className={s.thumb} /> : <span className={s.thumb} aria-hidden />}
                   <span className={s.lineText}>
                     <Type role="body">{dish.name}</Type>
-                    <Type role="body" className={s.money}>{priced ? formatRM(priced.unitSen * priced.quantity) : ' '}</Type>
+                    <Type role="body" className={s.money}>{unit === undefined ? ' ' : formatRM(unit * line.quantity)}</Type>
                   </span>
                   <Stepper name={dish.name} quantity={line.quantity} onChange={(next) => (next === 0 ? remove(dish.id) : bag.set(dish.id, next))} />
                 </li>
@@ -316,7 +325,7 @@ export function Checkout() {
             })}
           </ul>
           <AddOns lines={lines} />
-          <OrderTotal totalSen={options?.cart.totalSen} />
+          <OrderTotal totalSen={shownTotal} />
           <Link href={storefront.menu.href}>Add more from the menu</Link>
         </aside>
 
@@ -388,8 +397,8 @@ export function Checkout() {
             {loadError?.canRetry ? (
               <Cta onClick={retry}>Try again</Cta>
             ) : (
-              <Cta type="submit" busy={placing} isDisabled={!options || slots.length === 0 || loadError !== null}>
-                {placing ? 'Opening payment…' : options ? `Pay ${formatRM(options.cart.totalSen)}` : 'Pay'}
+              <Cta type="submit" busy={placing} isDisabled={!pricedNow || slots.length === 0 || loadError !== null}>
+                {placing ? 'Opening payment…' : options && pricedNow ? `Pay ${formatRM(options.cart.totalSen)}` : options ? 'Updating total…' : 'Pay'}
               </Cta>
             )}
             {activeSlot ? <Type role="caption" ink="secondary">Pick-up {activeSlot.day}, {activeSlot.time}</Type> : null}

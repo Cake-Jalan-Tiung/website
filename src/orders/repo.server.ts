@@ -1,6 +1,6 @@
 // Orders in D1. Every status change is one guarded UPDATE (`WHERE status IN <allowed from>`),
 // so a repeated or late event changes nothing instead of moving an order backwards.
-import {KITCHEN_STATUSES, ORDER_STATUSES, SOLD_STATUSES, TEST_DISH, allowedFrom, statusForPayment, type Customer, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import {ARRIVAL_OPENS_MINUTES, KITCHEN_STATUSES, ORDER_STATUSES, SOLD_STATUSES, TEST_DISH, allowedFrom, statusForPayment, type Customer, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import type {ConfirmedEvent} from '../payments/provider';
 import type {PosSale} from '../pos/sale';
 import type {PosBacklog} from '../pos/status';
@@ -88,11 +88,16 @@ export function ordersRepo(db: D1Database, shopId: string) {
       ]);
     },
 
-    /** The customer is at the shop. Only once, and only while the kitchen has the order. */
+    /** The customer is at the shop. Only once, only while the kitchen has the order, and only as `canArrive` allows. */
     async arrive(id: string, now: Date): Promise<boolean> {
+      // pickup_at is stored as toISOString(), so the strings compare as the instants do.
+      const opensBy = new Date(now.getTime() + ARRIVAL_OPENS_MINUTES * 60_000).toISOString();
       const result = await db
-        .prepare(`UPDATE orders SET arrived_at = ? WHERE id = ? AND shop_id = ? AND arrived_at IS NULL AND status IN (${placeholders(KITCHEN_STATUSES)})`)
-        .bind(now.toISOString(), id, shopId, ...KITCHEN_STATUSES)
+        .prepare(
+          `UPDATE orders SET arrived_at = ? WHERE id = ? AND shop_id = ? AND arrived_at IS NULL
+           AND status IN (${placeholders(KITCHEN_STATUSES)}) AND (status = 'ready' OR pickup_at <= ?)`,
+        )
+        .bind(now.toISOString(), id, shopId, ...KITCHEN_STATUSES, opensBy)
         .run();
       return result.meta.changes > 0;
     },

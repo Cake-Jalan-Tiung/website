@@ -2,11 +2,11 @@
 // order is in the kitchen it leads to that order's page; once it is done, the same order goes
 // back into the bag in one tap and checkout opens.
 import {useEffect, useState, type ReactNode} from 'react';
-import {bag} from '../orders/bag';
+import {bag, forgetPaying, payingIds, settleBag} from '../orders/bag';
 import {useAvailability} from '../orders/availability-store';
 import {getOrder, type PublicOrder} from '../orders/functions';
-import {CUSTOMER_STEPS, customerCopy, formatRM, isFinished, orderableDish} from '../orders/model';
-import {orderAgainLines, useRecentOrder, type RecentOrder} from '../orders/recent';
+import {CUSTOMER_STEPS, customerCopy, formatRM, isDormant, isFinished, orderableDish} from '../orders/model';
+import {orderAgainLines, rememberOrder, useRecentOrder, type RecentOrder} from '../orders/recent';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
 import {Type} from '../system/Type';
@@ -22,7 +22,8 @@ const isTracked = (order: PublicOrder, now: number) =>
 
 /** How the last order stands: undefined while asking, null once there is nothing to track. */
 function useTracked(recent: RecentOrder | null) {
-  const [tracked, setTracked] = useState<PublicOrder | null | undefined>(undefined);
+  // Each answer is kept with the order it is about, so a newer order never shows an older one's status.
+  const [answer, setAnswer] = useState<{id: string; order: PublicOrder | null} | null>(null);
   const id = recent?.id;
   // Long past its pick-up, the order needs no asking: Order again shows at once, with no jump.
   const past = recent !== null && Date.now() > Date.parse(recent.pickupAt) + TRACK_HOURS * 3_600_000;
@@ -30,14 +31,36 @@ function useTracked(recent: RecentOrder | null) {
     if (!id || past) return;
     let live = true;
     getOrder({data: {id}}).then(
-      (order) => live && setTracked(order && isTracked(order, Date.now()) ? order : null),
-      () => live && setTracked(null),
+      (order) => live && setAnswer({id, order: order && isTracked(order, Date.now()) ? order : null}),
+      () => live && setAnswer({id, order: null}),
     );
     return () => {
       live = false;
     };
   }, [id, past]);
-  return past ? null : tracked;
+  if (past) return null;
+  return answer && answer.id === id ? answer.order : undefined;
+}
+
+/**
+ * A payment whose page never came back (a bank app that kept the customer) still settles: the
+ * next page asks after each order this device went to pay for, so a paid bag empties and the
+ * order appears here, and a second payment for the same food is not invited.
+ */
+function useSettlePaying() {
+  useEffect(() => {
+    for (const id of payingIds()) {
+      getOrder({data: {id}}).then(
+        (order) => {
+          if (!order) return forgetPaying(id);
+          if (CUSTOMER_STEPS.some((step) => step.status === order.status)) return rememberOrder(order, settleBag(id));
+          // Unpaid long past its pick-up time: nothing more will come of it.
+          if ((isDormant(order.status) || order.status === 'refunded') && Date.now() > Date.parse(order.pickupAt)) forgetPaying(id);
+        },
+        () => undefined,
+      );
+    }
+  }, []);
 }
 
 function Strip({children}: {children: ReactNode}) {
@@ -49,19 +72,22 @@ function Strip({children}: {children: ReactNode}) {
 }
 
 export function LastOrder({store}: {store: Storefront}) {
+  useSettlePaying();
   const recent = useRecentOrder();
   const tracked = useTracked(recent);
   const availability = useAvailability();
-  if (!recent || tracked === undefined) return null;
+  if (!recent) return null;
 
-  if (tracked) {
+  // While its status is asked for, the strip already stands, from what this device remembers,
+  // so the page under it does not jump when the answer comes.
+  if (tracked || tracked === undefined) {
     return (
       <Strip>
-        <a href={`/order/${tracked.id}`} className={s.againTrack}>
+        <a href={`/order/${recent.id}`} className={s.againTrack} aria-busy={tracked === undefined || undefined}>
           <span className={s.againText}>
-            <Label ink="secondary">Order {tracked.code}</Label>
-            <Type role="body" className={s.againTitle}>{customerCopy(tracked.status).title}</Type>
-            <Type role="caption" ink="secondary">Pick-up {formatShopTime(store.timeZone, tracked.pickupAt)}</Type>
+            <Label ink="secondary">Order {recent.code}</Label>
+            <Type role="body" className={s.againTitle}>{tracked ? customerCopy(tracked.status).title : '\u00a0'}</Type>
+            <Type role="caption" ink="secondary">Pick-up {formatShopTime(store.timeZone, recent.pickupAt)}</Type>
           </span>
           <Label ink="blue">Track →</Label>
         </a>
@@ -71,6 +97,7 @@ export function LastOrder({store}: {store: Storefront}) {
 
   const lines = orderAgainLines(recent.lines, availability);
   if (lines.length === 0) return null;
+  const left = recent.lines.flatMap((line) => (lines.some((kept) => kept.dishId === line.dishId) ? [] : (orderableDish(store, line.dishId)?.name ?? [])));
   const named = lines.flatMap((line) => {
     const dish = orderableDish(store, line.dishId);
     return dish ? [{...line, dish}] : [];
@@ -84,6 +111,7 @@ export function LastOrder({store}: {store: Storefront}) {
         <span className={s.againSummary} data-fit="clips">
           <Type role="body">{summary}</Type>
         </span>
+        {left.length > 0 ? <Type role="caption" ink="secondary">Sold out today: {left.join(', ')}</Type> : null}
       </span>
       <button
         type="button"
