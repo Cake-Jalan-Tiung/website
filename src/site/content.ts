@@ -80,7 +80,6 @@ export const storefront: Storefront = {
   ],
   hoursLine: 'Open 8am – 6pm · Closed Thursdays',
   signOff,
-  announcements: ['Open 8am – 6pm · Closed Thursdays', 'Breakfast 8:30am – 12pm', 'Order online, collect at the counter'],
   nav: [
     {label: 'Menu', href: '/menu'},
     {label: 'Best sellers', href: '/#best-sellers'},
@@ -177,6 +176,8 @@ export const storefront: Storefront = {
   // Until the shop's own photos arrive, every photo is Beep's (src/assets/photos), and the
   // hero and category tiles borrow a dish's.
   heroCover: 'london-to-shah-alam',
+  // Inside the drawn shopfront: the dishes that have their own drawing, bakes first, then coffee.
+  counter: {dishes: ['shio-pan', 'croissant', 'butter-tteok', 'latte', 'long-black']},
   // Beep's own Best Seller list, in its order.
   bestSellers: ['london-to-shah-alam', 'shio-pan', 'dubai-chewy-cookie', 'butter-tteok'],
   mapHref: googleListing,

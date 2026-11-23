@@ -31,7 +31,7 @@ export const TEST_DISH: Dish = {id: 'staff-test', name: 'TEST order, do not make
 export const orderableDish = (store: Storefront, id: string): Dish | undefined => (id === TEST_DISH.id ? TEST_DISH : dishIndex(store).get(id));
 
 /** 5450 → "RM 54.50": checkout, receipts and the kitchen always show the currency and two decimals. */
-export const formatRM = (sen: number) => `RM ${(sen / 100).toFixed(2)}`;
+export const formatRM = (sen: number) => `RM\u00a0${(sen / 100).toFixed(2)}`;
 
 /**
  * Prices a cart from the catalogue. The browser only says which dishes and how many, so a
@@ -81,7 +81,7 @@ export function servingWindow(store: Storefront, cart: readonly CartLine[]): {sp
 const STATUSES = {
   awaiting_payment: {
     moves: ['paid', 'expired', 'cancelled'],
-    customer: {title: 'Waiting for payment', line: 'Finish paying and this page updates by itself.'},
+    customer: {title: 'Waiting for payment', line: 'If you have paid, this page updates by itself in a moment.'},
   },
   paid: {
     moves: ['accepted', 'refunded'],
@@ -95,14 +95,14 @@ const STATUSES = {
   },
   ready: {
     moves: ['collected', 'refunded'],
-    customer: {title: 'Ready to collect', line: 'Come to the counter and give your name.', step: 'Ready'},
+    customer: {title: 'Ready to collect', line: 'Come to the counter and give your order code.', step: 'Ready'},
     kitchen: {column: 'Ready to collect', next: {to: 'collected', label: 'Collected'}},
   },
   collected: {moves: [], customer: {title: 'Collected', line: 'Enjoy. Thank you for ordering.', step: 'Collected'}},
   // Money can still arrive after an order expired or a payment attempt failed (the customer
   // retried, or a callback was late); money that arrives is always honoured.
-  expired: {moves: ['paid'], customer: {title: 'Payment not received', line: 'This order expired before it was paid. Nothing was charged.'}},
-  cancelled: {moves: ['paid'], customer: {title: 'Cancelled', line: 'This order was cancelled. Nothing was charged.'}},
+  expired: {moves: ['paid'], customer: {title: 'Payment not received', line: 'If you paid, keep this page open: it updates by itself once the payment arrives. If not, nothing was taken.'}},
+  cancelled: {moves: ['paid'], customer: {title: 'Payment didn’t go through', line: 'If money left your account, keep this page open: it updates by itself once the payment arrives. If not, nothing was taken.'}},
   refunded: {moves: [], customer: {title: 'Refunded', line: 'This order was refunded to your payment method.'}},
 } as const satisfies Record<string, StatusInfo>;
 
@@ -166,15 +166,38 @@ export function settledStatus(state: PaymentState, createdAt: string, now: Date)
 
 export type Customer = {name: string; phone: string; email: string; note: string};
 
+export type CustomerField = 'name' | 'phone' | 'email';
+export const NAME_MAX = 60;
+
+const localMobile = (phone: string) => {
+  const digits = phone.trim().replace(/[\s\-()]/g, '');
+  return digits.startsWith('+60') ? digits.slice(3) : digits.startsWith('60') ? digits.slice(2) : digits.replace(/^0/, '');
+};
+
+/**
+ * What is wrong with each detail, in the words the customer reads beside that field. Checkout
+ * shows these before it sends anything; the server parses with the same rules.
+ */
+export function customerProblems(input: unknown): Partial<Record<CustomerField, string>> {
+  const problems: Partial<Record<CustomerField, string>> = {};
+  const name = textAt(input, 'name').trim();
+  if (name.length < 1) problems.name = 'Enter the name to call at the counter.';
+  else if (name.length > NAME_MAX) problems.name = `Use a name of ${NAME_MAX} characters or fewer.`;
+  if (!/^1\d{8,9}$/.test(localMobile(textAt(input, 'phone')))) problems.phone = 'Enter a Malaysian mobile number, like 012-345 6789.';
+  const email = textAt(input, 'email').trim();
+  if (email.length < 1) problems.email = 'Enter an email for your receipt.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) problems.email = 'Enter an email like name@example.com.';
+  return problems;
+}
+
 /** Parses who is collecting, from untrusted input. Phone numbers come back as +60…. */
 export function parseCustomer(input: unknown): Customer {
-  const name = textAt(input, 'name').trim();
-  if (name.length < 1 || name.length > 60) throw new CartError('Add the name to call at the counter.');
-  const digits = textAt(input, 'phone').trim().replace(/[\s\-()]/g, '');
-  const local = digits.startsWith('+60') ? digits.slice(3) : digits.startsWith('60') ? digits.slice(2) : digits.replace(/^0/, '');
-  if (!/^1\d{8,9}$/.test(local)) throw new CartError('Add a Malaysian mobile number, like 012-345 6789.');
-  const email = textAt(input, 'email').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new CartError('Add an email for the receipt.');
-  const note = textAt(input, 'note').trim().slice(0, 280);
-  return {name, phone: `+60${local}`, email, note};
+  const [problem] = Object.values(customerProblems(input));
+  if (problem) throw new CartError(problem);
+  return {
+    name: textAt(input, 'name').trim(),
+    phone: `+60${localMobile(textAt(input, 'phone'))}`,
+    email: textAt(input, 'email').trim().toLowerCase(),
+    note: textAt(input, 'note').trim().slice(0, 280),
+  };
 }

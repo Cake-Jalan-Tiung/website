@@ -10,18 +10,18 @@ Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or
 </div>
 
 <p align="center">
-  <img src="docs/images/storefront.jpg" alt="The Cake Jalan Tiung home page: a hero with the line 'Baking the world a little sweeter', the Google rating, Order now and Delivery on Beep, beside a photo of a boxed chocolate cake slice." width="72%">
+  <img src="docs/images/storefront.jpg" alt="The Cake Jalan Tiung home page: a hero with the Google rating, the line 'Baking the world a little sweeter', a full-width Order for pick-up and a Delivery on Beep link, beside a flat drawing of the shopfront: brick, the blue sign, the black awning, a yellow door between glass windows, stools and a rubber tree." width="72%">
   &nbsp;
-  <img src="docs/images/menu-mobile.jpg" alt="The menu on a phone: category links, then Indulgent Iceberg Cheesecake with its photo, description, price and an Add button." width="22%">
+  <img src="docs/images/menu-mobile.jpg" alt="The menu on a phone: the category rail under the header, then dishes as rows, each with its name, two lines of description and price beside its photo, with a cobalt + on the photo's corner." width="22%">
 </p>
 
 ## What it does
 
 | For customers | For the shop |
 | --- | --- |
-| Menu with photos, prices and Add on every dish | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
-| A bag that survives closing the tab | Pause online ordering for today, or until resumed |
-| Checkout on one page: pick-up time inside opening hours, details, payment method | Mark dishes sold out until tomorrow |
+| Menu built for a phone: a category rail, one-tap + on every photo, a sheet for each dish | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
+| A bag pinned to the foot of the screen that survives closing the tab | Pause online ordering for today, or until resumed |
+| Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered | Mark dishes sold out until tomorrow |
 | Payment through [CHIP](https://www.chip-in.asia) (FPX, DuitNow QR, Touch 'n Go, GrabPay, cards) | Paid orders recorded as sales in StoreHub, cancelled on refund |
 | An order page that follows the order to Ready | An RM 1 staff test order to try real payments end to end |
 | Delivery still through Beep | Failure alerts by email |
@@ -71,6 +71,7 @@ With `PAYMENTS=fake`, checkout opens a built-in test payment page and no money m
 | `pnpm test` | Unit tests: pricing, pick-up times, order statuses, payments, StoreHub sales, brand rules |
 | `pnpm typecheck` | Generates Worker types, then type-checks |
 | `pnpm fit` | Every page at six widths; fails on anything that overflows or a console error |
+| `pnpm walk` | Orders on a phone from home to paid against a running dev server, screenshot per screen; fails on a spill, a console error or a broken step |
 | `pnpm spec` | Rendered components against the brand's Paper measurements |
 | `pnpm build` | Production build |
 | `pnpm deploy` | Deploy to Cloudflare |

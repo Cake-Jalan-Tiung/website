@@ -1,50 +1,42 @@
-import {Button} from '@astryxdesign/core/Button';
 import {Link} from '@astryxdesign/core/Link';
-import {Band, Page, Row, Stack} from '../system/layout';
+import {Band, Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {MenuList, Sections, StoreFooter, StoreHeader, StoreSection} from '../storefront/sections';
+import {CategoryRail, MenuList, Sections, StoreFooter, StoreHeader, StoreSection} from '../storefront/sections';
 import {BagBar} from '../storefront/bag';
+import {DishSheet} from '../storefront/sheet';
 import {formatSpan} from '../storefront/hours';
 import {storefront} from './content';
 
-/** The whole menu, one section per category, with a jump to each and the ways to order. */
+/** The whole menu: a short line on how ordering works, the category rail, then every category as rows. */
 export function Menu() {
   return (
-    <Page top={<StoreHeader store={storefront} />} bottom={<StoreFooter store={storefront} />}>
+    <Page top={<StoreHeader store={storefront} onMenu />} bottom={<StoreFooter store={storefront} />}>
       <Band ground="cream-100">
-        <Stack gap="lg">
-          <Stack gap="sm">
-            <Type role="display" as="h1">
-              Menu
-            </Type>
-            <Type role="body" as="p" ink="secondary">
-              {storefront.hoursLine}
-            </Type>
-          </Stack>
+        <Stack gap="sm">
+          <Type role="display" as="h1">
+            Menu
+          </Type>
           <Type role="body" as="p">
-            Add what you like, pay online, and collect it at the counter.
+            Order now, collect at the counter. {storefront.hoursLine}.
             {storefront.delivery ? (
               <>
                 {' '}
-                For delivery, <Link href={storefront.delivery.href}>order on Beep</Link>.
+                Delivery is on <Link href={storefront.delivery.href}>Beep</Link>.
               </>
             ) : null}
           </Type>
-          <Row as="nav" gap="xs" aria-label="Categories">
-            {storefront.categories.map((category) => (
-              <Button key={category.id} variant="ghost" size="sm" href={`#${category.id}`} label={category.name} />
-            ))}
-          </Row>
         </Stack>
       </Band>
+      <CategoryRail categories={storefront.categories} />
       <Sections>
         {storefront.categories.map((category) => (
-          <StoreSection key={category.id} id={category.id} title={category.name} note={category.servedBetween && formatSpan(category.servedBetween)}>
+          <StoreSection key={category.id} id={category.id} title={category.name} note={category.servedBetween && `Served ${formatSpan(category.servedBetween)}`}>
             <MenuList dishes={category.dishes} store={storefront} />
           </StoreSection>
         ))}
       </Sections>
       <BagBar store={storefront} />
+      <DishSheet store={storefront} />
     </Page>
   );
 }

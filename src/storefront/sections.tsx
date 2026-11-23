@@ -1,41 +1,31 @@
 // The storefront's sections, built from the system's primitives and brand components. Each
 // takes its content as props, so the same structure serves any shop that fills the
-// `Storefront` shape: ticker, sticky header, hero with rating and two actions, facts,
+// `Storefront` shape: sticky header, hero with rating and its action, facts,
 // best-seller cards, category tiles, menu rows, season band, visit, footer.
-import type {ReactNode} from 'react';
+import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {Link} from '@astryxdesign/core/Link';
 import {Field} from '../system/Field';
 import {Label, PinkDot, Price, Stage, Tiung, TypesetWordmark} from '../system/components';
-import {Band, Columns, Marquee, Row, Stack} from '../system/layout';
+import {Band, Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
+import {dishIndex, dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
 import {formatSpan, shopClock} from './hours';
 import {photoFor} from './photos';
-import {AddToBag, BagButton, PausedNotice} from './bag';
+import {AddToBag, BagButton, Cta, formatPrice, PausedNotice} from './bag';
+import {OpenDish, openDish} from './sheet';
+import {Counter} from './counter';
+import {count as counted} from '../lib/format';
 import s from './storefront.module.css';
 
-/** The passing line over the header: what is true this week, on ink. */
-function Ticker({items}: {items: readonly string[]}) {
-  return (
-    <Field colour="ink" outlined={false} className={s.ticker}>
-      <Marquee gap="lg">
-        {items.map((item) => (
-          <Row key={item} as="span" gap="lg">
-            <Label>{item}</Label>
-            <PinkDot />
-          </Row>
-        ))}
-      </Marquee>
-    </Field>
-  );
-}
-
-/** Ticker, then one slim sticky bar: the bird and wordmark home, the shop's pages, and Order now. */
-export function StoreHeader({store}: {store: Storefront}) {
+/**
+ * Browsing: one slim sticky bar with the bird and wordmark home, the shop's pages and Order now
+ * or the bag. Checkout and the order page are `focus`: no nav, only the way home and back to
+ * the menu, so nothing pulls away from paying.
+ */
+export function StoreHeader({store, mode = 'browse', onMenu = false}: {store: Storefront; mode?: 'browse' | 'focus'; onMenu?: boolean}) {
   return (
     <>
-      <Ticker items={store.announcements} />
       <Field as="header" colour="paper" outlined={false} className={s.header}>
         <div className={s.headerInner}>
           <a href="/" className={s.brand} aria-label={`${store.name}, home`}>
@@ -44,17 +34,25 @@ export function StoreHeader({store}: {store: Storefront}) {
               <TypesetWordmark role="caption" />
             </span>
           </a>
-          <nav aria-label="Main" className={s.nav} data-fit="scrolls">
-            {store.nav.map((action) => (
-              <Link key={action.href} href={action.href}>
-                <Label ink="blue">{action.label}</Label>
-              </Link>
-            ))}
-          </nav>
-          <BagButton store={store} />
+          {mode === 'browse' ? (
+            <>
+              <nav aria-label="Main" className={s.nav} data-fit="scrolls">
+                {store.nav.map((action) => (
+                  <Link key={action.href} href={action.href}>
+                    <Label ink="blue">{action.label}</Label>
+                  </Link>
+                ))}
+              </nav>
+              <BagButton store={store} onMenu={onMenu} />
+            </>
+          ) : (
+            <a href={store.menu.href} className={s.back}>
+              <Label ink="blue">← Menu</Label>
+            </a>
+          )}
         </div>
       </Field>
-      <PausedNotice />
+      {mode === 'browse' ? <PausedNotice /> : null}
     </>
   );
 }
@@ -106,26 +104,36 @@ function Media({id, cover, alt, ratio, drawing}: {id: string; cover?: string; al
   );
 }
 
-/** The first screen: rating, the shop's line, its two asks, and the hero photo. */
-export function Hero({title, lede, art, store}: {title: string; lede: string; art: Drawing; store: Storefront}) {
+/**
+ * The first screen: a picture the shop composes (`visual`), its drawings, or its hero photo, first on a phone so
+ * the page opens on cake; the rating, the shop's line, then one big Order and the delivery link.
+ */
+export function Hero({title, art, store, visual}: {title: string; art: Drawing; store: Storefront; visual?: ReactNode}) {
+  // The hero borrows a dish's photo until it has its own, so its alt names that dish.
+  const shown = photoFor('hero') ? store.name : (store.heroCover && dishIndex(store).get(store.heroCover)?.name) || store.name;
+  const photo = <Media id="hero" cover={store.heroCover} alt={shown} ratio="4 / 3" drawing={art} />;
   return (
-    <Band ground="cream-100">
+    <>
+      {visual || store.counter ? null : <span className={s.heroPhone}>{photo}</span>}
+      <Band ground="cream-100">
       <Columns count={2} align="center" gap="xl">
         <Stack gap="lg">
           {store.proof ? <Rating proof={store.proof} /> : null}
-          <Stack gap="md">
-            <Type role="display" as="h1" className={s.headline}>
-              {title}
-            </Type>
-            <Type role="body" as="p" className={s.lede}>
-              {lede}
-            </Type>
-          </Stack>
-          <Actions primary={{label: 'Order now', href: store.menu.href}} secondary={store.delivery} />
+          <Type role="display" as="h1" className={s.headline}>
+            {title}
+          </Type>
+          <span className={s.heroActions}>
+            <Cta href={store.menu.href}>Order for pick-up</Cta>
+          </span>
         </Stack>
-        <Media id="hero" cover={store.heroCover} alt={store.name} ratio="1 / 1" drawing={art} />
+        {visual || store.counter ? (
+          <span className={s.heroArt}>{visual ?? (store.counter ? <Counter dishes={dishesById(store, store.counter.dishes)} more={store.menu} /> : null)}</span>
+        ) : (
+          <span className={s.heroMedia}>{photo}</span>
+        )}
       </Columns>
     </Band>
+    </>
   );
 }
 
@@ -178,16 +186,26 @@ export function StoreSection({id, title, note, action, children}: {id: string; t
   );
 }
 
-/** A dish: photo, name, price under it, the start of its description, and Add. */
+/**
+ * A dish: photo with + on its corner, name, price, the start of its description. The name is a
+ * button stretched over the card, so a tap anywhere but + opens the dish.
+ */
 function DishCard({dish}: {dish: Dish}) {
   return (
     <article className={s.card}>
-      <Media id={dish.id} alt={dish.name} ratio="1 / 1" drawing={dish.drawing} />
+      <span className={s.cardMedia}>
+        <Media id={dish.id} alt="" ratio="1 / 1" drawing={dish.drawing} />
+        <span className={s.corner}>
+          <AddToBag dish={dish} onOpen={() => openDish(dish.id)} />
+        </span>
+      </span>
       <Stack gap="xs">
         <Type role="body" as="h3" className={s.dishName}>
-          {dish.name}
+          <OpenDish dish={dish} />
         </Type>
-        <Price amount={dish.price} role="body" />
+        <Type role="body" className={s.money}>
+          {formatPrice(dish.price)}
+        </Type>
         {dish.description ? (
           <span className={s.clamp} data-fit="clips">
             <Type role="caption" ink="secondary">
@@ -196,7 +214,6 @@ function DishCard({dish}: {dish: Dish}) {
           </span>
         ) : null}
       </Stack>
-      <AddToBag dish={dish} />
     </article>
   );
 }
@@ -223,7 +240,7 @@ export function CategoryTiles({categories, menuHref}: {categories: readonly Cate
               {category.name}
             </Type>
             <Type role="caption" ink="secondary">
-              {category.dishes.length} items
+              {counted(category.dishes.length, 'item', 'items')}
             </Type>
           </Stack>
         </a>
@@ -232,33 +249,91 @@ export function CategoryTiles({categories, menuHref}: {categories: readonly Cate
   );
 }
 
-/** A category's dishes as hairline rows: photo if there is one, name, full description, price and Add. */
+/**
+ * The categories as a rail that stays under the header: a tap jumps to one, and the rail marks
+ * whichever the customer has scrolled to, keeping it in view.
+ */
+export function CategoryRail({categories}: {categories: readonly Category[]}) {
+  const [active, setActive] = useState(categories[0]?.id);
+  const rail = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      // The same line a tapped anchor lands on: the page's scroll padding.
+      const line = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) + 1;
+      let current = categories[0]?.id;
+      for (const category of categories) {
+        const section = document.getElementById(category.id)?.closest('section');
+        if (section && section.getBoundingClientRect().top <= line) current = category.id;
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(read);
+    };
+    read();
+    window.addEventListener('scroll', onScroll, {passive: true});
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [categories]);
+
+  useEffect(() => {
+    const box = rail.current;
+    const link = box?.querySelector<HTMLElement>('[aria-current]');
+    if (!box || !link) return;
+    // Smooth only where motion is welcome: the rail's CSS sets scroll-behavior under no-preference.
+    box.scrollTo({left: link.offsetLeft - (box.clientWidth - link.offsetWidth) / 2});
+  }, [active]);
+
+  return (
+    <Field as="nav" colour="paper" outlined={false} aria-label="Categories" className={s.rail}>
+      <span ref={rail} className={s.railScroll} data-fit="scrolls">
+        {categories.map((category) => (
+          <a key={category.id} href={`#${category.id}`} className={s.railLink} aria-current={category.id === active ? 'true' : undefined}>
+            <Label>{category.name}</Label>
+          </a>
+        ))}
+      </span>
+    </Field>
+  );
+}
+
+/** A category's dishes as hairline rows: name, two lines of description and price, beside the photo with + on its corner. */
 export function MenuList({dishes, store}: {dishes: readonly Dish[]; store: Storefront}) {
   return (
     <ul className={s.menuList}>
-      {dishes.map((dish) => {
-        const photo = photoFor(dish.id);
-        return (
-          <li key={dish.id} className={s.menuRow}>
-            {photo ? <img src={photo} alt="" loading="lazy" className={s.thumb} /> : <span className={s.thumb} aria-hidden />}
-            <span className={s.menuText}>
-              <Type role="subhead" as="h3">
-                {dish.name}
-              </Type>
-              {dish.description ? (
+      {dishes.map((dish) => (
+        <li key={dish.id} className={s.menuRow}>
+          <span className={s.menuText}>
+            <Type role="body" as="h3" className={s.dishName}>
+              <OpenDish dish={dish} />
+            </Type>
+            {dish.description ? (
+              <span className={s.clamp} data-fit="clips">
                 <Type role="caption" ink="secondary">
                   {dish.description}
                 </Type>
-              ) : null}
-              {store.bestSellers.includes(dish.id) ? <Label ink="blue">Best seller</Label> : null}
+              </span>
+            ) : null}
+            <Row gap="sm">
+              <Type role="body" className={s.money}>
+                {formatPrice(dish.price)}
+              </Type>
+              {store.bestSellers.includes(dish.id) ? <Label>Best seller</Label> : null}
+            </Row>
+          </span>
+          <span className={s.menuMedia}>
+            <Media id={dish.id} alt="" ratio="1 / 1" drawing={dish.drawing} />
+            <span className={s.corner}>
+              <AddToBag dish={dish} onOpen={() => openDish(dish.id)} />
             </span>
-            <span className={s.menuBuy}>
-              <Price amount={dish.price} />
-              <AddToBag dish={dish} />
-            </span>
-          </li>
-        );
-      })}
+          </span>
+        </li>
+      ))}
     </ul>
   );
 }

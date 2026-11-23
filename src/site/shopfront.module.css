@@ -1,0 +1,134 @@
+/* The shopfront scene. Flat fields of the brand's colours under ink outlines, no gradients and
+   no shadows; the drawing's units are the scene's (1000 wide, 1100 tall). */
+
+.shopfront { display: flex; flex-direction: column; gap: var(--cjt-space-xs); min-width: 0; }
+/* Both views share one grid cell: the street sets the height, and the menu inside may grow it
+   when its words need more room (large text, a narrow phone). */
+.scene {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--cjt-color-ink);
+  background: var(--cjt-color-cream-100);
+}
+.outside, .inside { grid-area: 1 / 1; min-width: 0; }
+.outside { position: relative; display: block; aspect-ratio: 1000 / 1100; }
+.street { display: block; width: 100%; height: 100%; }
+
+/* Paint. */
+.brick { fill: var(--cjt-color-teh); }
+.mortar { fill: none; stroke: var(--cjt-color-ink); stroke-width: 2; }
+.plaster { fill: var(--cjt-color-chalk); }
+.concrete { fill: var(--cjt-color-chalk); }
+.road { fill: var(--cjt-color-rule); }
+.paper { fill: var(--cjt-color-paper); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.notice { fill: var(--cjt-color-cream-400); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.ink { fill: var(--cjt-color-ink); }
+.glass { fill: var(--cjt-color-blue-50); }
+.warm { fill: var(--cjt-color-cream-400); }
+.beam { fill: var(--cjt-color-cream-200); }
+.blind { fill: var(--cjt-color-ink); stroke: var(--cjt-color-chalk); stroke-width: 2; }
+.pink { fill: var(--cjt-color-pink); }
+.gula { fill: var(--cjt-color-gula); stroke: var(--cjt-color-ink); stroke-width: 3; }
+.teh { fill: var(--cjt-color-teh); }
+.ube { fill: var(--cjt-color-ube); }
+.ais { fill: var(--cjt-color-ais); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.board { fill: var(--cjt-color-ink); stroke: var(--cjt-color-gula); stroke-width: 6; }
+.wood { fill: var(--cjt-color-gula); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.doorGlass { fill: var(--cjt-color-blue-100); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.stoolSeat { fill: var(--cjt-color-gula); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.leaf { fill: var(--cjt-color-pandan); stroke: var(--cjt-color-ink); stroke-width: 4; stroke-linejoin: round; }
+.shoot { fill: var(--cjt-color-pink); stroke: var(--cjt-color-ink); stroke-width: 4; stroke-linejoin: round; }
+.blade { fill: var(--cjt-color-pandan); stroke: var(--cjt-color-ink); stroke-width: 4; stroke-linejoin: round; }
+
+/* Lines. */
+.line, .thin, .heavy, .rust, .slat, .glint, .legs, .chair, .easel, .stoolLegs, .trunk, .branch, .vein, .chalkLine, .blueLine, .frame, .frameThin {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.line { stroke: var(--cjt-color-ink); stroke-width: 4; }
+.thin { stroke: var(--cjt-color-ink); stroke-width: 2.5; }
+.heavy { stroke: var(--cjt-color-ink); stroke-width: 7; }
+.rust { stroke: var(--cjt-color-teh); stroke-width: 3; }
+.slat { stroke: var(--cjt-color-chalk); stroke-width: 2; opacity: 0.35; }
+.glint { stroke: var(--cjt-color-paper); stroke-width: 6; }
+.legs { stroke: var(--cjt-color-ink); stroke-width: 6; }
+.chair { stroke: var(--cjt-color-ink); stroke-width: 5; }
+.easel { stroke: var(--cjt-color-gula); stroke-width: 8; }
+.stoolLegs { stroke: var(--cjt-color-gula); stroke-width: 7; }
+.trunk { stroke: var(--cjt-color-ink); stroke-width: 16; }
+.branch { stroke: var(--cjt-color-ink); stroke-width: 6; }
+.vein { stroke: var(--cjt-color-ink); stroke-width: 2.5; }
+.chalkLine { stroke: var(--cjt-color-paper); stroke-width: 3; opacity: 0.8; }
+.blueLine { stroke: var(--cjt-color-blue); stroke-width: 4; }
+.frame { stroke: var(--cjt-color-gula); stroke-width: 10; }
+.frameThin { stroke: var(--cjt-color-ink); stroke-width: 3; }
+
+/* Type in the drawing: the sign in the brand's caps, the decal in paper, the board in chalk. */
+.sign { fill: var(--cjt-color-blue); font-family: inherit; font-size: 52px; font-weight: 500; letter-spacing: 0.1em; }
+.number { fill: var(--cjt-color-ink); font-family: inherit; font-size: 26px; font-weight: 500; }
+.decal { fill: var(--cjt-color-paper); stroke: var(--cjt-color-ink); stroke-width: 1.5; paint-order: stroke; font-family: inherit; font-size: 36px; font-weight: 500; letter-spacing: 0.06em; }
+.chalk { fill: var(--cjt-color-paper); font-family: inherit; font-size: 19px; font-weight: 500; letter-spacing: 0.08em; text-anchor: middle; }
+
+/* The door: a real button over the doorway, hinged on its left edge. */
+.door {
+  position: absolute;
+  left: 50%;
+  top: 54.545%;
+  width: 14.2%;
+  height: 24.364%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: 0 50%;
+}
+.door > svg { display: block; width: 100%; height: 100%; }
+.door:focus-visible { outline: 3px solid var(--cjt-color-blue); outline-offset: 3px; }
+.outside { perspective: 900px; transform-origin: 57% 66.8%; }
+
+/* Inside: the counter, centred, and the way back out. */
+.inside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--cjt-space-sm);
+  padding: var(--cjt-space-md);
+  box-sizing: border-box;
+  background: var(--cjt-color-cream-100);
+  visibility: hidden;
+  opacity: 0;
+}
+/* Outside, the menu is laid over the street and takes no room; inside, it may grow the scene. */
+.scene:not([data-inside]) .inside { position: absolute; inset: 0; overflow: hidden; }
+.scene[data-inside] .inside { visibility: visible; opacity: 1; }
+.scene[data-inside] .outside { visibility: hidden; }
+.back { align-self: flex-start; display: flex; align-items: center; min-height: var(--store-tap, 48px); padding: 0; border: 0; background: none; cursor: pointer; }
+.back:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }
+
+.hint { display: block; }
+.hint[data-hidden] { visibility: hidden; }
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* Going in: the door swings open (0–600ms), the street falls away past it (350–1100ms),
+     the counter comes up (from 900ms; its own drawings follow on their delays). */
+  .door { transition: transform 600ms cubic-bezier(0.65, 0, 0.35, 1) 400ms; }
+  .scene[data-inside] .door { transform: rotateY(-108deg); transition-delay: 0ms; }
+  .outside { transition: transform 750ms cubic-bezier(0.55, 0, 0.75, 0.2) 0ms, opacity 300ms linear 0ms, visibility 0s linear 0s; }
+  .scene[data-inside] .outside { transform: scale(3.4); opacity: 0; transition: transform 750ms cubic-bezier(0.55, 0, 0.75, 0.2) 350ms, opacity 300ms linear 800ms, visibility 0s linear 1100ms; }
+  .inside { --enter-delay: 0ms; transition: opacity 300ms linear 0ms, visibility 0s linear 300ms; }
+  .scene[data-inside] .inside { --enter-delay: 850ms; transition: opacity 350ms linear 850ms, visibility 0s linear 0s; }
+
+  /* Before anyone has knocked: the door gives a small nudge once, to say it opens. */
+  .door { animation: nudge 1200ms cubic-bezier(0.34, 1.56, 0.64, 1) 1800ms 2; }
+  .scene[data-inside] .door { animation: none; }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .scene:not([data-inside]) .door:hover { transform: rotateY(-22deg); transition-delay: 0ms; transition-duration: 350ms; }
+}
+@keyframes nudge {
+  0%, 60%, 100% { transform: none; }
+  30% { transform: rotateY(-16deg); }
+}

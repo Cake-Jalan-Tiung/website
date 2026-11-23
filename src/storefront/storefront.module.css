@@ -1,13 +1,20 @@
 /* Storefront metrics. Values are tokens only; these are our compositions, not Paper's. A shop
    page is denser than the brand book: one slim header, sections a 64px step apart. */
 
-:root { --store-header-h: 64px; }
+:root {
+  --store-header-h: 64px;
+  /* Every touch target on the storefront: 48px, past the 44px a finger needs. */
+  --store-tap: calc(var(--cjt-space-lg) + var(--cjt-space-xs));
+  --store-rail-h: var(--store-tap);
+  --store-cta-h: calc(var(--cjt-space-xl) - var(--cjt-space-xs));
+  --store-heavy: calc(var(--cjt-space-xs) / 2);
+}
 html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-space-md)); }
+html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-rail-h) + var(--cjt-space-sm)); }
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.rail), .railScroll { scroll-behavior: smooth; }
+}
 
-/* The passing line over the header: one label tall, a small step above and below. */
-.ticker { padding-block: var(--cjt-space-xs); }
-/* The marquee's keyboard pause button, held to the ticker's one line so it is not clipped. */
-.ticker button { inset-block: 0; padding-block: 0; }
 
 /* The header: sticky, one row, a hairline under it. */
 .header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--cjt-color-rule); }
@@ -34,9 +41,20 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
   white-space: nowrap;
 }
 
-/* The hero's line and lede, held to a readable measure. */
+/* The hero's line, held to a readable measure. */
 .headline { max-width: 12ch; }
-.lede { max-width: var(--cjt-measure); }
+.heroActions { display: flex; flex-direction: column; align-items: flex-start; gap: var(--cjt-space-sm); max-width: var(--cjt-container-tile); }
+.heroActions > .cta { width: 100%; }
+.heroMedia { display: block; }
+/* On a phone the page opens on the photo, edge to edge under the header; beside the words it is hidden. */
+.heroPhone { display: none; }
+.heroArt { display: block; min-width: 0; }
+@media (max-width: 899px) {
+  .heroArt { order: -1; }
+  .heroPhone { display: block; }
+  .heroMedia { display: none; }
+  .heroActions { max-width: none; }
+}
 
 /* Sections between the hero and the visit band. */
 .sections {
@@ -61,23 +79,72 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
 .media > [class] { --h: 100cqh; height: 100%; min-height: 0; box-sizing: border-box; }
 .dishName { font-weight: var(--cjt-weight-medium); }
 
-/* A card: media, then name and price on one baseline, the description, the action. */
-.card { display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; margin: 0; }
-.card > :last-child:is(a, button) { align-self: flex-start; }
-.cardHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--cjt-space-sm); }
-/* The price or the count never shrinks; when the row runs out, it drops under the name. */
-.cardHead > :last-child { flex-shrink: 0; }
+/* A card: the photo with + on its corner, then name, price and the start of the description. */
+.card { position: relative; display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; margin: 0; }
+.cardMedia { position: relative; display: block; }
+.money { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
+
+/* The dish's name is the button that opens it, stretched over its whole card or row. */
+.open { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; touch-action: manipulation; }
+.open::after { content: ''; position: absolute; inset: 0; }
+.open:focus-visible { outline: none; }
+.open:focus-visible::after { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }
+@media (hover: hover) {
+  .card:hover .dishName,
+  .menuRow:hover .dishName { text-decoration: underline; text-underline-offset: 0.2em; }
+}
+
+/* The photo's corner: + in one tap, the count once it is in the bag. It sits over the stretched name. */
+.corner { position: absolute; right: 0; bottom: 0; z-index: 1; }
+.add { display: block; padding: 0; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+.addFace { display: grid; place-items: center; width: var(--store-tap); height: var(--store-tap); }
+.addCount { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
+.add:disabled { cursor: not-allowed; opacity: 0.4; }
+.add:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
+.soldOut { display: block; padding: var(--cjt-space-xs); }
 
 /* A whole tile that is one link: no underline on the block, a clear focus ring, the name underlines under the pointer. */
 .tileLink { color: inherit; text-decoration: none; }
 .tileLink:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: var(--cjt-space-xs); }
-.tileLink:hover .tileName { text-decoration: underline; text-underline-offset: 0.2em; }
+@media (hover: hover) {
+  .tileLink:hover .tileName { text-decoration: underline; text-underline-offset: 0.2em; }
+}
 
 /* Two lines of a description on a card; the menu prints it in full. */
-.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: var(--cjt-leading-caption); }
 
-/* The menu: hairline rows in two columns, name and description beside the price. */
+/* The category rail: sticky under the header, one line that scrolls sideways, the category in
+   view underlined with a heavy ink bar. */
+.rail { position: sticky; top: var(--store-header-h); z-index: 2; border-bottom: 1px solid var(--cjt-color-ink); }
+.railScroll {
+  display: flex;
+  gap: var(--cjt-space-md);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  height: var(--store-rail-h);
+  margin-inline: auto;
+  padding-inline: var(--cjt-space-gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+.railScroll::-webkit-scrollbar { display: none; }
+.railLink {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  border-block: var(--store-heavy) solid transparent;
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+.railLink[aria-current] { border-bottom-color: var(--cjt-color-ink); }
+.railLink[aria-current] * { font-weight: var(--cjt-weight-medium); }
+.railLink:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -2px; }
+
+/* The menu: hairline rows, name, description and price beside the photo. Two columns on a wide screen. */
 .menuList {
+  margin-block-start: calc(-1 * var(--cjt-space-md));
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--cjt-space-xl);
@@ -86,15 +153,16 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
   list-style: none;
 }
 .menuRow {
-  display: flex;
-  align-items: flex-start;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--cjt-space-md);
   padding-block: var(--cjt-space-md);
   border-bottom: 1px solid var(--cjt-color-rule);
 }
-.menuRow > :last-child { flex-shrink: 0; margin-inline-start: auto; }
+.menuRow:has(.open:active) .dishName { text-decoration: underline; text-underline-offset: 0.2em; }
 .menuText { display: flex; flex-direction: column; gap: var(--cjt-space-xs); min-width: 0; }
-.thumb { flex-shrink: 0; width: 72px; height: 72px; object-fit: cover; }
+.menuMedia { position: relative; display: block; width: calc(var(--cjt-space-2xl) + var(--cjt-space-md)); align-self: start; }
 
 /* Hours by day: day and hours on one line, a hairline under each, today in medium. */
 .week { margin: 0; max-width: var(--cjt-measure); }
@@ -104,12 +172,14 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
 
 /* A plain link on ink: the text keeps its legal ink, the underline comes on hover and focus. */
 .plainLink { color: inherit; text-decoration: none; }
-.plainLink:hover,
 .plainLink:focus-visible { text-decoration: underline; text-underline-offset: 0.2em; }
+@media (hover: hover) {
+  .plainLink:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+}
 .plainLink:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
 /* The legal line at the foot: a reversed hairline over it. */
-.legal { margin: 0; padding-top: var(--cjt-space-md); border-top: 1px solid var(--cjt-color-rule-reversed); }
+.legal { margin: 0; padding-top: var(--cjt-space-md); border-top: 1px solid var(--cjt-color-rule-reversed); line-height: var(--cjt-leading-caption); }
 
 @media (max-width: 1199px) {
   .headerInner, .sections { padding-inline: var(--cjt-space-lg); }
@@ -130,28 +200,115 @@ html:has(.header) { scroll-padding-top: calc(var(--store-header-h) + var(--cjt-s
 @media (max-width: 399px) {
   .brandName { display: none; }
 }
-
-/* The bag: a stepper in place of Add once a dish is in it, and a bar that stays at the foot of
-   the screen until the footer, so it never covers the last of the page. */
-.stepper { display: inline-flex; align-items: center; gap: var(--cjt-space-xs); align-self: flex-start; }
-.stepperCount { min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
-.menuBuy { display: flex; flex-direction: column; align-items: flex-end; gap: var(--cjt-space-sm); flex-shrink: 0; margin-inline-start: auto; }
-.bagBar {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  background: var(--cjt-color-paper);
-  border-top: 1px solid var(--cjt-color-rule);
+.headerInner > a:last-child { flex-shrink: 0; }
+@media (max-width: 299px) {
+  .nav { display: none; }
+  .headerInner > a:last-child { margin-inline-start: auto; }
+  .menuRow { grid-template-columns: minmax(0, 1fr); }
 }
-.bagBarInner {
+
+/* − n +: one hairline frame around three 48px cells, a cell inverted while pressed. */
+.stepper { display: inline-flex; flex-shrink: 0; align-items: center; border: 1px solid var(--cjt-color-ink); }
+.stepperButton {
+  display: grid;
+  place-items: center;
+  width: var(--store-tap);
+  height: var(--store-tap);
+  padding: 0;
+  border: 0;
+  background: var(--cjt-color-paper);
+  color: var(--cjt-color-ink);
+  font: inherit;
+  font-size: var(--cjt-text-subhead);
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.stepperButton:active:not(:disabled) { background: var(--cjt-color-ink); color: var(--cjt-color-paper); }
+.stepperButton:disabled { cursor: not-allowed; opacity: 0.3; }
+.stepperButton:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -2px; }
+.stepperCount { min-width: var(--cjt-space-md); text-align: center; font-variant-numeric: tabular-nums; }
+
+/* The one big action on a screen: a cobalt field, cream words, full width. */
+.cta { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; text-decoration: none; cursor: pointer; touch-action: manipulation; }
+.ctaFace { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--store-cta-h); padding: var(--cjt-space-xs) var(--cjt-space-md); overflow: hidden; }
+/* The words wrap rather than clip: the total on the button is what the customer is confirming. */
+.ctaText { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; text-align: center; }
+/* Pressing a cobalt action (+, the big action, the bag bar) sinks it a little; never while disabled. */
+@media (prefers-reduced-motion: no-preference) {
+  .addFace, .ctaFace, .bagBarLink { transition: scale 150ms ease-out; }
+  .add:not(:disabled):active .addFace,
+  .cta:not(:disabled):active .ctaFace,
+  .bagBarLink:active { scale: 0.96; }
+}
+.cta:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
+.cta:disabled:not([data-busy]) { cursor: not-allowed; }
+.cta:disabled:not([data-busy]) .ctaFace { opacity: 0.4; }
+/* While busy, a cream bar runs along the foot of the button. */
+.cta[data-busy] { cursor: progress; }
+.cta[data-busy] .ctaFace::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--store-heavy);
+  background: var(--cjt-color-cream-400);
+  transform-origin: left;
+  animation: busy 1.2s ease-in-out infinite;
+}
+@keyframes busy {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta[data-busy] .ctaFace::after { animation: none; }
+}
+
+/* The bag bar: one cobalt bar pinned to the foot of the screen until the footer, count, View bag, total. */
+.bagBar { position: sticky; bottom: 0; z-index: 2; }
+.bagBarField { padding-bottom: env(safe-area-inset-bottom); }
+.bagBarLink {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--cjt-space-md);
+  gap: var(--cjt-space-sm);
   box-sizing: border-box;
   max-width: var(--cjt-container-sheet);
+  min-height: var(--store-cta-h);
   margin-inline: auto;
-  padding: var(--cjt-space-sm) var(--cjt-space-gutter);
+  padding-inline: var(--cjt-space-gutter);
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
 }
-@media (max-width: 1199px) { .bagBarInner { padding-inline: var(--cjt-space-lg); } }
-@media (max-width: 899px) { .bagBarInner { padding-inline: var(--cjt-space-sm); } }
+.bagBarLink:focus-visible { outline: 2px solid var(--cjt-color-cream-400); outline-offset: -4px; }
+.bagCount { display: grid; place-items: center; min-width: var(--cjt-space-lg); height: calc(var(--cjt-space-md) + var(--cjt-space-xs)); border: 1px solid var(--cjt-color-cream-400); font-variant-numeric: tabular-nums; }
+.bagBarLabel { flex: 1 0 auto; font-weight: var(--cjt-weight-medium); }
+.bagBarTotal { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
+@media (max-width: 1199px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-lg); } }
+@media (max-width: 899px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-sm); } }
+
+/* The dish sheet: the photo edge to edge, the words, then the quantity and the action held at its foot. */
+.sheet { display: flex; flex-direction: column; }
+.sheetPhoto { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: 45svh; object-fit: cover; }
+.sheetBody { display: flex; flex-direction: column; gap: var(--cjt-space-xs); padding: var(--cjt-space-md) var(--cjt-space-sm) var(--cjt-space-md); }
+.sheetName { font-weight: var(--cjt-weight-medium); }
+.sheetPrice { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
+.sheetFoot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjt-space-sm);
+  padding: var(--cjt-space-sm);
+  padding-bottom: calc(var(--cjt-space-sm) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--cjt-color-ink);
+  background: var(--cjt-color-paper);
+}
+.sheetFoot > .cta { flex: 1 1 calc(var(--cjt-space-2xl) + var(--cjt-space-lg)); min-width: 0; }
+.sheetNote { flex: 1 1 100%; }
+.sheetFoot .ctaFace { min-height: var(--store-tap); padding-inline: var(--cjt-space-xs); }
+
+/* Focus mode's way back to the menu. */
+.back { display: flex; align-items: center; min-height: var(--store-tap); margin-inline-start: auto; text-decoration: none; }
+.back:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }

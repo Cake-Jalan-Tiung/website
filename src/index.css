@@ -3,3 +3,14 @@ html {
   background: var(--color-background-body);
   color: var(--color-text-primary);
 }
+
+/* On a phone: no grey flash on tap, no double-tap zoom delay on controls, no rubber-band
+   scroll chaining out of sheets, and text that keeps its size when the phone is turned. */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+:is(a, button, label, select, summary) { touch-action: manipulation; }
