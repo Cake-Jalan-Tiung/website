@@ -255,6 +255,7 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   transform-origin: left;
   animation: busy 1.2s ease-in-out infinite;
 }
+.cta[data-busy] .ctaFace[data-colour='cream-400']::after { background: var(--cjt-color-blue); }
 @keyframes busy {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
@@ -282,7 +283,15 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 }
 .bagBarLink:focus-visible { outline: 2px solid var(--cjt-color-cream-400); outline-offset: -4px; }
 .bagCount { display: grid; place-items: center; min-width: var(--cjt-space-lg); height: calc(var(--cjt-space-md) + var(--cjt-space-xs)); border: 1px solid var(--cjt-color-cream-400); font-variant-numeric: tabular-nums; }
-.bagBarLabel { flex: 1 0 auto; font-weight: var(--cjt-weight-medium); }
+.bagBarLabel { display: flex; flex: 1 0 auto; flex-direction: column; min-width: 0; }
+.bagBarTitle { font-weight: var(--cjt-weight-medium); }
+/* A change in the count lands with a small pop, so an add made far from the bar is still seen. */
+@media (prefers-reduced-motion: no-preference) {
+  .bagCount { animation: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+}
+@keyframes pop {
+  from { scale: 1.35; background: var(--cjt-color-cream-400); color: var(--cjt-color-blue); }
+}
 .bagBarTotal { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
 @media (max-width: 1199px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-lg); } }
 @media (max-width: 899px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-sm); } }
@@ -312,3 +321,53 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 /* Focus mode's way back to the menu. */
 .back { display: flex; align-items: center; min-height: var(--store-tap); margin-inline-start: auto; text-decoration: none; }
 .back:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }
+
+/* Open now and the soonest pick-up: a dot, cobalt while the door is open, then the line. It
+   keeps its line before the time is read, so nothing below it jumps. */
+.promise { display: inline-flex; align-items: center; gap: var(--cjt-space-xs); }
+.promise[data-shown]::before {
+  content: '';
+  flex-shrink: 0;
+  width: var(--cjt-space-xs);
+  height: var(--cjt-space-xs);
+  border-radius: var(--radius-full, 999px);
+  background: color-mix(in srgb, currentColor 35%, transparent);
+}
+.promise[data-open]::before { background: var(--cjt-color-blue); }
+@media (prefers-reduced-motion: no-preference) {
+  .promise[data-shown] { animation: arrive 240ms ease-out; }
+}
+@keyframes arrive {
+  from { opacity: 0; }
+}
+
+/* The last order under the header: what it is on the left, the one action on the right. */
+.again { border-bottom: 1px solid var(--cjt-color-rule); }
+.againInner {
+  display: flex;
+  align-items: center;
+  gap: var(--cjt-space-md);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding: var(--cjt-space-sm) var(--cjt-space-gutter);
+}
+.againText { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.againTitle { font-weight: var(--cjt-weight-medium); }
+.againSummary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.againTrack { display: flex; flex: 1 1 auto; align-items: center; gap: var(--cjt-space-md); min-height: var(--store-tap); color: inherit; text-decoration: none; touch-action: manipulation; }
+.againTrack:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }
+.againButton { flex-shrink: 0; padding: 0; border: 0; background: none; font: inherit; cursor: pointer; touch-action: manipulation; }
+.againFace { display: flex; align-items: center; min-height: var(--store-tap); padding-inline: var(--cjt-space-sm); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.againButton:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .againFace { transition: scale 150ms ease-out; }
+  .againButton:active .againFace { scale: 0.96; }
+}
+@media (max-width: 1199px) { .againInner { padding-inline: var(--cjt-space-lg); } }
+@media (max-width: 899px) { .againInner { padding-inline: var(--cjt-space-sm); } }
+/* On a narrow phone the action takes its own line, full width, so the price never squeezes the order. */
+@media (max-width: 479px) {
+  .againInner:has(.againButton) { flex-direction: column; align-items: stretch; gap: var(--cjt-space-xs); }
+  .againFace { justify-content: center; }
+}

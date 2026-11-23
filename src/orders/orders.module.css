@@ -30,6 +30,23 @@
 .thumb { flex-shrink: 0; width: calc(var(--cjt-space-xl) - var(--cjt-space-xs)); height: calc(var(--cjt-space-xl) - var(--cjt-space-xs)); object-fit: cover; background: var(--cjt-color-cream-400); }
 .total { display: flex; justify-content: space-between; align-items: baseline; padding-top: var(--cjt-space-sm); }
 
+/* Add-ons: a short row of small photos with + on the corner, scrolled sideways if it runs out of room. */
+.addOns { display: flex; flex-direction: column; gap: var(--cjt-space-sm); padding-block: var(--cjt-space-sm); border-bottom: 1px solid var(--cjt-color-rule); }
+.addOnList { display: grid; grid-auto-columns: calc(var(--cjt-space-2xl) + var(--cjt-space-md)); grid-auto-flow: column; gap: var(--cjt-space-sm); margin: 0; padding: 0; overflow-x: auto; list-style: none; scrollbar-width: none; scroll-snap-type: x mandatory; }
+.addOnList::-webkit-scrollbar { display: none; }
+.addOn { display: flex; flex-direction: column; gap: 2px; min-width: 0; scroll-snap-align: start; }
+.addOnMedia { position: relative; display: block; margin-bottom: var(--cjt-space-xs); }
+.addOnCorner { position: absolute; right: 0; bottom: 0; }
+.addOnName { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: var(--cjt-leading-caption); }
+@media (prefers-reduced-motion: no-preference) {
+  .addOn { animation: offer 260ms ease-out backwards; }
+  .addOn:nth-child(2) { animation-delay: 60ms; }
+  .addOn:nth-child(3) { animation-delay: 120ms; }
+}
+@keyframes offer {
+  from { opacity: 0; translate: 0 var(--cjt-space-xs); }
+}
+
 /* Choices as chips: native radios, so the keyboard and screen readers get a real group. */
 .chips { display: flex; flex-wrap: wrap; gap: var(--cjt-space-xs); margin: 0; padding: 0; border: 0; }
 .chip { position: relative; display: inline-flex; align-items: center; min-height: var(--store-tap, 48px); padding-inline: var(--cjt-space-md); border: 1px solid var(--cjt-color-ink); cursor: pointer; background: var(--cjt-color-paper); touch-action: manipulation; }
@@ -121,6 +138,7 @@
 /* The steps' bars take the ground's own text colour. */
 .ticket[data-ground='blue'] { color: var(--cjt-color-cream-400); }
 .ticketInner { display: flex; flex-direction: column; gap: var(--cjt-space-md); box-sizing: border-box; max-width: var(--cjt-container-content); margin-inline: auto; padding-inline: var(--cjt-space-gutter); }
+.arrived { font-weight: var(--cjt-weight-medium); }
 .bigCode { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
 .progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cjt-space-xl)), 1fr)); gap: var(--cjt-space-xs); margin: 0; padding: 0; list-style: none; }
 .progress li { display: flex; flex-direction: column; gap: var(--cjt-space-xs); padding-top: var(--cjt-space-sm); border-top: var(--store-heavy, 4px) solid color-mix(in srgb, currentColor 20%, transparent); }
@@ -146,6 +164,9 @@
 .column { display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; }
 .staffTicket { display: flex; flex-direction: column; gap: var(--cjt-space-sm); padding: var(--cjt-space-md); border: 1px solid var(--cjt-color-rule); background: var(--cjt-color-paper); }
 .staffTicket[data-new] { border-color: var(--cjt-color-blue); box-shadow: inset 0 0 0 2px var(--cjt-color-blue); }
+.staffTicket[data-here] { border-color: var(--cjt-color-pink); box-shadow: inset 0 0 0 2px var(--cjt-color-pink); }
+/* A customer at the counter: the loudest thing on a ticket, a pink bar the width of it. */
+.here { padding: var(--cjt-space-xs) var(--cjt-space-sm); background: var(--cjt-color-pink); font-weight: var(--cjt-weight-medium); }
 .ticketHead { display: flex; justify-content: space-between; align-items: baseline; gap: var(--cjt-space-sm); }
 .code { font-variant-numeric: tabular-nums; letter-spacing: 0.08em; }
 .items { margin: 0; padding: 0; list-style: none; }

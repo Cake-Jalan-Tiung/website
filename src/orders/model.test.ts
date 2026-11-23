@@ -2,7 +2,8 @@ import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
 import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, isFinished, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
-import {isOpenSlot, pickupSlots} from './pickup';
+import {isOpenSlot, pickupPromise, pickupSlots} from './pickup';
+import {parseRecent} from './recent';
 
 describe('priceCart', () => {
   it('prices from the catalogue in sen', () => {
@@ -70,6 +71,45 @@ describe('pickupSlots', () => {
     const [first] = pickupSlots(storefront, wednesdayEvening);
     expect(isOpenSlot(storefront, wednesdayEvening, first.at)).toBe(true);
     expect(isOpenSlot(storefront, wednesdayEvening, '2026-11-26T03:00:00.000Z')).toBe(false);
+  });
+});
+
+describe('pickupPromise', () => {
+  it('says the shop is open and the soonest time today', () => {
+    // Wednesday 25 Nov 2026, 2:05pm in Kuala Lumpur.
+    expect(pickupPromise(storefront, new Date('2026-11-25T06:05:00Z'))).toEqual({isOpen: true, soonest: 'Pick-up today from 2:30pm'});
+  });
+
+  it('says closed, and names the next open day, across the closed Thursday', () => {
+    // Wednesday 25 Nov 2026, 11pm.
+    expect(pickupPromise(storefront, new Date('2026-11-25T15:00:00Z'))).toEqual({isOpen: false, soonest: 'Pick-up Fri 27 Nov from 8am'});
+  });
+
+  it('says tomorrow before opening the next morning', () => {
+    // Monday 23 Nov 2026, 10pm.
+    expect(pickupPromise(storefront, new Date('2026-11-23T14:00:00Z'))?.soonest).toBe('Pick-up tomorrow from 8am');
+  });
+
+  it('follows a bag that can only be collected in the morning', () => {
+    const window = servingWindow(storefront, [{dishId: 'classic-big-breakfast', quantity: 1}]);
+    expect(pickupPromise(storefront, new Date('2026-11-25T06:05:00Z'), window?.span)?.soonest).toBe('Pick-up Fri 27 Nov from 8:30am');
+  });
+});
+
+describe('parseRecent', () => {
+  const order = {id: '1e5446e5-b8ee', code: '1E5446', pickupAt: '2026-11-25T06:30:00.000Z'};
+
+  it('keeps an order with lines still on the menu', () => {
+    const lines = [{dishId: 'shio-pan', quantity: 2}, {dishId: 'gone', quantity: 1}];
+    expect(parseRecent(JSON.stringify({...order, lines}))).toEqual({...order, lines: [{dishId: 'shio-pan', quantity: 2}]});
+  });
+
+  it('forgets an order with nothing left to order again, the staff test order, or garbage', () => {
+    expect(parseRecent(JSON.stringify({...order, lines: [{dishId: 'gone', quantity: 1}]}))).toBeNull();
+    expect(parseRecent(JSON.stringify({...order, lines: [{dishId: TEST_DISH.id, quantity: 1}]}))).toBeNull();
+    expect(parseRecent(JSON.stringify({...order, pickupAt: 'soon', lines: [{dishId: 'shio-pan', quantity: 1}]}))).toBeNull();
+    expect(parseRecent('not json')).toBeNull();
+    expect(parseRecent(null)).toBeNull();
   });
 });
 

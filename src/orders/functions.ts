@@ -149,6 +149,8 @@ export type PublicOrder = {
   firstName: string;
   items: PricedLine[];
   totalSen: number;
+  /** When the customer said they were at the shop. */
+  arrivedAt: string | null;
 };
 
 const toPublic = (order: OrderRow): PublicOrder => ({
@@ -159,6 +161,7 @@ const toPublic = (order: OrderRow): PublicOrder => ({
   firstName: order.customer.name.split(/\s+/)[0],
   items: order.items,
   totalSen: order.totalSen,
+  arrivedAt: order.arrivedAt,
 });
 
 /**
@@ -185,6 +188,19 @@ export const getOrder = createServerFn({method: 'GET'})
     const to = settledStatus(state, order.createdAt, now);
     if (to && (await orders.move(id, to, now))) return toPublic({...order, status: to});
     return toPublic(order);
+  });
+
+/**
+ * "I'm here", from the order's page: the kitchen's board marks the order and rings. Whoever has
+ * the order's link can say so, as they can read it; it changes nothing but this one mark.
+ */
+export const arriveForOrder = createServerFn({method: 'POST'})
+  .validator(field('id'))
+  .handler(async ({data: id}): Promise<PublicOrder | null> => {
+    const orders = repo();
+    await orders.arrive(id, new Date());
+    const order = await orders.get(id);
+    return order ? toPublic(order) : null;
   });
 
 /** The order behind the local test provider's payment page; null unless this deploy runs PAYMENTS=fake. */

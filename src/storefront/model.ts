@@ -53,6 +53,8 @@ export type Storefront = {
   categories: readonly Category[];
   /** Dish ids, in the order the shop ranks them. */
   bestSellers: readonly string[];
+  /** Category ids whose dishes checkout may offer beside a bag: things that go with an order, not a second meal. */
+  addOns: readonly string[];
   /** The dish whose photo stands in for the hero until there is a `hero` photo. */
   heroCover?: string;
   /** Dishes for the hero's counter, in place of its photo: each must have a drawing, which is what the counter shows. */

@@ -22,6 +22,11 @@ export function parseBag(raw: string | null): readonly CartLine[] {
   } catch {
     return EMPTY;
   }
+  return parseLines(value);
+}
+
+/** The same rules for lines already parsed from JSON, such as a remembered order's. */
+export function parseLines(value: unknown): readonly CartLine[] {
   if (!Array.isArray(value)) return EMPTY;
   const seen = new Set<string>();
   return value.flatMap((line: unknown) => {
@@ -75,6 +80,12 @@ export const bag = {
   },
   add(dishId: string) {
     bag.set(dishId, quantityOf(dishId) + 1);
+  },
+  /** Adds every line to what is already in the bag, in one change; each dish stops at the maximum. */
+  addAll(added: readonly CartLine[]) {
+    const next = new Map(load().map((line) => [line.dishId, line.quantity]));
+    for (const line of added) next.set(line.dishId, Math.min(MAX_QUANTITY, (next.get(line.dishId) ?? 0) + line.quantity));
+    commit([...next].map(([dishId, quantity]) => ({dishId, quantity})));
   },
   clear() {
     commit(EMPTY);

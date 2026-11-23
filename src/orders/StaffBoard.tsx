@@ -8,7 +8,7 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {storefront} from '../site/content';
 import {Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {formatShopTime} from '../storefront/hours';
+import {formatMinutes, formatShopTime, shopClock} from '../storefront/hours';
 import {Sections} from '../storefront/sections';
 import {advanceOrder, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffBoardData, type StaffOrder} from './functions';
 import type {PosBacklog, PosState} from '../pos/status';
@@ -81,7 +81,7 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
   const next = kitchenNext(order.status);
   const minutes = minutesUntil(order.pickupAt, Date.now());
   return (
-    <article className={s.staffTicket} data-new={isNew ? '' : undefined} aria-label={`Order ${order.code} for ${order.name}`}>
+    <article className={s.staffTicket} data-new={isNew ? '' : undefined} data-here={order.arrivedAt ? '' : undefined} aria-label={`Order ${order.code} for ${order.name}`}>
       <span className={s.ticketHead}>
         <Type role="subhead" as="h3">
           <span className={s.code}>{order.code}</span> · {order.name}
@@ -90,6 +90,11 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
           {minutes < 0 ? `Late ${-minutes} min` : minutes <= COUNTDOWN_MINUTES ? `In ${minutes} min` : formatShopTime(storefront.timeZone, order.pickupAt)}
         </Type>
       </span>
+      {order.arrivedAt ? (
+        <span className={s.here}>
+          <Type role="body">Customer is here · since {formatMinutes(shopClock(storefront.timeZone, new Date(order.arrivedAt)).minutes)}</Type>
+        </span>
+      ) : null}
       <ul className={s.items}>
         {order.items.map((item) => (
           <li key={item.dishId}>
@@ -212,6 +217,8 @@ export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
   // announced or highlighted; every later one is.
   const onOpen = useRef(new Set((initial?.orders ?? []).filter(isNewStatus).map((o) => o.id)));
   const rung = useRef(new Set(onOpen.current));
+  // Customers already marked here when the board opened are not announced again; every later arrival rings.
+  const greeted = useRef(new Set((initial?.orders ?? []).filter((o) => o.arrivedAt).map((o) => o.id)));
   const soundRef = useRef(sound);
   soundRef.current = sound;
 
@@ -223,11 +230,14 @@ export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
         onOpen.current.add(order.id);
         rung.current.add(order.id);
       }
+      for (const order of nextOrders.filter((o) => o.arrivedAt)) greeted.current.add(order.id);
     }
     setBoard(next);
-    const arrived = nextOrders.filter((o) => isNewStatus(o) && !rung.current.has(o.id));
-    arrived.forEach((o) => rung.current.add(o.id));
-    if (arrived.length > 0 && soundRef.current) ring(soundRef.current);
+    const placed = nextOrders.filter((o) => isNewStatus(o) && !rung.current.has(o.id));
+    placed.forEach((o) => rung.current.add(o.id));
+    const walkedIn = nextOrders.filter((o) => o.arrivedAt && !greeted.current.has(o.id));
+    walkedIn.forEach((o) => greeted.current.add(o.id));
+    if ((placed.length > 0 || walkedIn.length > 0) && soundRef.current) ring(soundRef.current);
   };
 
   const signedIn = board !== null;
@@ -240,9 +250,11 @@ export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
   }, [signedIn]);
 
   const waiting = orders.filter(isNewStatus).length;
+  const here = orders.filter((o) => o.arrivedAt && o.status !== 'collected').length;
   useEffect(() => {
-    document.title = waiting > 0 ? `(${waiting}) New orders — Kitchen` : 'Kitchen — Cake Jalan Tiung';
-  }, [waiting]);
+    const parts = [waiting > 0 ? `${waiting} new` : '', here > 0 ? `${here} here` : ''].filter(Boolean);
+    document.title = parts.length > 0 ? `(${parts.join(', ')}) Kitchen — Cake Jalan Tiung` : 'Kitchen — Cake Jalan Tiung';
+  }, [waiting, here]);
 
   if (board === null) {
     return (
@@ -278,7 +290,8 @@ export function StaffBoard({initial}: {initial: StaffBoardData | null}) {
         {board.pos ? <PosWarnings backlog={board.pos} /> : null}
         <Columns count={3} gap="md" align="start">
           {KITCHEN_COLUMNS.map((column) => {
-            const tickets = orders.filter((o) => o.status === column.status);
+            // A customer standing at the counter goes to the top of their column; the rest keep pick-up order.
+            const tickets = orders.filter((o) => o.status === column.status).sort((a, b) => Number(b.arrivedAt !== null) - Number(a.arrivedAt !== null));
             return (
               <section key={column.status} className={s.column} aria-labelledby={`column-${column.status}`}>
                 <Type role="subhead" as="h2" id={`column-${column.status}`}>

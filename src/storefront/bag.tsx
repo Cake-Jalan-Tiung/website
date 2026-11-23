@@ -7,11 +7,12 @@ import {Button} from '@astryxdesign/core/Button';
 import {VisuallyHidden} from '@astryxdesign/core/VisuallyHidden';
 import {bag, countOf, useBag, useBagQuantity} from '../orders/bag';
 import {useAvailability} from '../orders/availability-store';
-import {MAX_QUANTITY, formatRM, orderableDish} from '../orders/model';
-import {Field} from '../system/Field';
+import {MAX_QUANTITY, formatRM, orderableDish, type CartLine} from '../orders/model';
+import {Field, useGround} from '../system/Field';
 import {count as counted} from '../lib/format';
 import {Type} from '../system/Type';
 import type {Dish, Storefront} from './model';
+import {usePickupPromise} from './promise';
 import s from './storefront.module.css';
 
 /** "RM 28" or "RM 20.50": the storefront always says the currency, and sen only when there are any. */
@@ -22,8 +23,10 @@ export const formatPrice = (ringgit: number) => `RM\u00a0${Number.isInteger(ring
  * with `href`, otherwise a button; `busy` keeps it pressed while what it started is under way.
  */
 export function Cta({children, href, id, onClick, type = 'button', isDisabled, busy}: {children: ReactNode; href?: string; id?: string; onClick?: () => void; type?: 'button' | 'submit'; isDisabled?: boolean; busy?: boolean}) {
+  // On a cobalt ground (an order that is ready) cobalt would vanish, so the action turns cream.
+  const colour = useGround() === 'blue' ? 'cream-400' : 'blue';
   const face = (
-    <Field as="span" colour="blue" outlined={false} className={s.ctaFace}>
+    <Field as="span" colour={colour} outlined={false} className={s.ctaFace} data-colour={colour}>
       <Type role="body" className={s.ctaText}>
         {children}
       </Type>
@@ -109,6 +112,12 @@ export function BagButton({store, onMenu}: {store: Storefront; onMenu: boolean})
   return onMenu ? null : <Button variant="primary" label="Order now" href={store.menu.href} />;
 }
 
+/** The bag's soonest pick-up, under View bag: what is in it decides, so a breakfast says morning. */
+function BagPromise({store, lines}: {store: Storefront; lines: readonly CartLine[]}) {
+  const promise = usePickupPromise(store, lines);
+  return promise ? <Type role="caption">{promise.soonest}</Type> : null;
+}
+
 /** Pinned to the foot of the screen while the bag has something in it: one cobalt bar, one tap to checkout. */
 export function BagBar({store}: {store: Storefront}) {
   const lines = useBag();
@@ -121,12 +130,16 @@ export function BagBar({store}: {store: Storefront}) {
     <aside className={s.bagBar} aria-label="Your bag">
       <Field colour="blue" outlined={false} className={s.bagBarField}>
         <a href="/checkout" className={s.bagBarLink}>
-          <span className={s.bagCount}>
+          {/* Keyed on the count, so each change lands with a small pop: the add was heard. */}
+          <span className={s.bagCount} key={count}>
             <Type role="body">{count}</Type>
           </span>
-          <Type role="body" className={s.bagBarLabel}>
-            View bag<VisuallyHidden>, {counted(count, 'item', 'items')}</VisuallyHidden>
-          </Type>
+          <span className={s.bagBarLabel}>
+            <Type role="body" className={s.bagBarTitle}>
+              View bag<VisuallyHidden>, {counted(count, 'item', 'items')}</VisuallyHidden>
+            </Type>
+            <BagPromise store={store} lines={lines} />
+          </span>
           <Type role="body" className={s.bagBarTotal}>
             {formatRM(totalSen)}
           </Type>

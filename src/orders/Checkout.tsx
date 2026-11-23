@@ -9,9 +9,11 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {VisuallyHidden} from '@astryxdesign/core/VisuallyHidden';
 import {storefront} from '../site/content';
 import {textAt} from '../lib/guards';
-import {Cta, Stepper} from '../storefront/bag';
+import {AddToBag, Cta, Stepper, formatPrice} from '../storefront/bag';
 import {photoFor} from '../storefront/photos';
-import {StoreHeader} from '../storefront/sections';
+import {Media, StoreHeader} from '../storefront/sections';
+import {suggestionsFor} from '../storefront/suggest';
+import {useAvailability} from './availability-store';
 import {formatSpan} from '../storefront/hours';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
@@ -19,7 +21,7 @@ import {count as counted, list} from '../lib/format';
 import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {bag, countOf, useBag, useBagReady} from './bag';
-import {customerProblems, formatRM, orderableDish, type Customer, type CustomerField} from './model';
+import {customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
 import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
 import type {PaymentMethod} from '../payments/provider';
 import s from './orders.module.css';
@@ -75,6 +77,40 @@ function Choices({legend, name, options, value, onChange, look}: {
         </label>
       ))}
     </fieldset>
+  );
+}
+
+/**
+ * One optional row under the bag, never a step in the way: a dish from each add-on the bag lacks.
+ * The offer is set when checkout opens; adding one takes it out of the row and puts nothing in
+ * its place, so the row only ever gets shorter.
+ */
+function AddOns({lines}: {lines: readonly CartLine[]}) {
+  const {ordersPaused, soldOut} = useAvailability();
+  const [offered] = useState(() => suggestionsFor(storefront, lines, (id) => photoFor(id) !== undefined));
+  const inBag = new Set(lines.map((line) => line.dishId));
+  const shown = offered.filter((dish) => !inBag.has(dish.id) && !soldOut[dish.id]);
+  if (ordersPaused || shown.length === 0) return null;
+  return (
+    <section className={s.addOns} aria-labelledby="add-ons">
+      <Label ink="secondary" as="h3" id="add-ons">Add to your order</Label>
+      <ul className={s.addOnList}>
+        {shown.map((dish) => (
+          <li key={dish.id} className={s.addOn}>
+            <span className={s.addOnMedia}>
+              <Media id={dish.id} alt="" ratio="1 / 1" drawing={dish.drawing} />
+              <span className={s.addOnCorner}>
+                <AddToBag dish={dish} onOpen={() => undefined} />
+              </span>
+            </span>
+            <span className={s.addOnName}>
+              <Type role="caption">{dish.name}</Type>
+            </span>
+            <Type role="caption" className={s.money}>{formatPrice(dish.price)}</Type>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -275,6 +311,7 @@ export function Checkout() {
               );
             })}
           </ul>
+          <AddOns lines={lines} />
           <OrderTotal totalSen={options?.cart.totalSen} />
           <Link href={storefront.menu.href}>Add more from the menu</Link>
         </aside>

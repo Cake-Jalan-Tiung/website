@@ -53,6 +53,8 @@ await page.getByRole('button', {name: '← Back outside'}).click();
 await page.waitForTimeout(1500);
 expect(await page.getByRole('button', {name: /^Open the door/}).evaluate((el) => el === document.activeElement), 'coming back out returns focus to the door');
 await page.goto(`${base}/menu`, {waitUntil: 'networkidle'});
+await page.waitForTimeout(400);
+expect(/^(Open|Closed) now · Pick-up /.test((await page.getByText(/ now · Pick-up /).first().textContent()) ?? ''), 'the menu says whether the shop is open and the soonest pick-up');
 await screen('menu');
 const pastries = page.getByRole('navigation', {name: 'Categories'}).getByRole('link', {name: 'Pastries'});
 await pastries.click();
@@ -76,6 +78,7 @@ await page.getByRole('button', {name: /^One less /}).click();
 await page.getByRole('button', {name: 'Remove from bag'}).click();
 await page.waitForTimeout(600);
 expect((await page.getByRole('link', {name: /^\d+ View bag/}).textContent())?.includes('3'), 'the removed dish left the bag');
+expect((await page.getByRole('link', {name: /^\d+ View bag/}).textContent())?.includes('Pick-up '), 'the bag bar gives the soonest pick-up for the bag');
 await page.evaluate(() => window.scrollTo(0, 2400));
 await screen('menu-with-bag');
 
@@ -92,6 +95,15 @@ const pay = async () => {
 // First order: the payment is cancelled, and the customer is offered another try.
 await checkout();
 await screen('checkout');
+// The add-on row offers what the bag lacks; one tap moves a dish into the bag and out of the row.
+const addOns = page.getByRole('region', {name: 'Add to your order'});
+const offered = addOns.getByRole('button', {name: /^Add .* to bag$/}).first();
+const offeredName = (await offered.getAttribute('aria-label'))?.replace(/^Add (.*) to bag$/, '$1');
+await offered.click();
+await page.waitForTimeout(600);
+expect((await page.locator('[data-line]').allTextContents()).some((line) => offeredName && line.includes(offeredName)), 'an add-on joins the bag');
+expect((await addOns.getByRole('button', {name: `Add ${offeredName} to bag`}).count()) === 0, 'an added add-on leaves the row');
+await screen('checkout-add-on');
 await page.getByRole('button', {name: /^Pay/}).click();
 await page.waitForTimeout(800);
 expect(await page.getByLabel('Name').evaluate((el) => el === document.activeElement), 'Pay with no details takes the customer to Name');
@@ -117,15 +129,36 @@ await screen('order-cancelled');
 // Second order, as a returning customer: details and way to pay are remembered.
 await checkout();
 await screen('checkout-returning', {full: true});
+const pickupAt = await page.getByLabel('Time').inputValue();
 await pay();
 await page.getByRole('button', {name: /^Pay$/}).click();
 await page.waitForURL(/\/order\//);
 await settle();
 await screen('order-paid', {full: true});
 const orderUrl = page.url();
+const orderCode = (await page.locator('p').filter({hasText: /^[0-9A-F]{6}$/}).first().textContent())?.trim();
+
+// Back on the home page, the order in the kitchen is one tap away.
+await page.goto(`${base}/`, {waitUntil: 'networkidle'});
+await settle();
+expect((await page.getByRole('link', {name: new RegExp(`Order ${orderCode}.*Track`)}).count()) === 1, 'home leads back to the order in the kitchen');
+await screen('home-tracking');
+// I'm here opens near the pick-up time, so a tap at home cannot ring the kitchen.
+const arrivalOpen = Date.now() >= Date.parse(pickupAt) - 45 * 60_000;
+await page.goto(orderUrl, {waitUntil: 'networkidle'});
+await settle();
+expect(arrivalOpen || (await page.getByRole('button', {name: 'I’m here'}).count()) === 0, 'I’m here waits for the pick-up time to come near');
+// At the shop, ten minutes before pick-up: I'm here tells the counter.
+await page.clock.setFixedTime(new Date(Date.parse(pickupAt) - 10 * 60_000));
+await page.goto(orderUrl, {waitUntil: 'networkidle'});
+await settle();
+await page.getByRole('button', {name: 'I’m here'}).click();
+await page.waitForTimeout(800);
+expect((await page.getByText('The counter knows you’re here').count()) === 1, 'I’m here is acknowledged');
+await screen('order-arrived');
 
 if (process.env.WALK_STAFF_PIN) {
-  const code = (await page.locator('p').filter({hasText: /^[0-9A-F]{6}$/}).first().textContent())?.trim();
+  const code = orderCode;
   const staff = await context.newPage();
   await staff.goto(`${base}/staff`, {waitUntil: 'networkidle'});
   if (await staff.getByLabel('Staff PIN').count()) {
@@ -134,14 +167,32 @@ if (process.env.WALK_STAFF_PIN) {
     await staff.waitForTimeout(1500);
   }
   const ticket = staff.getByRole('article', {name: new RegExp(`^Order ${code} `)});
+  expect((await ticket.getByText(/^Customer is here · since /).count()) === 1, 'the kitchen sees the customer has arrived');
+  await staff.screenshot({path: `${out}/staff-arrived.png`});
   await ticket.getByRole('button', {name: 'Accept'}).click();
   await staff.waitForTimeout(1000);
   await ticket.getByRole('button', {name: 'Mark ready'}).click();
   await staff.waitForTimeout(1000);
+  await page.goto(orderUrl, {waitUntil: 'networkidle'});
+  await settle();
+  expect((await page.title()).startsWith('Ready to collect'), 'the tab title says the order is ready');
+  await screen('order-ready');
+  await ticket.getByRole('button', {name: 'Collected'}).click();
+  await staff.waitForTimeout(1000);
   await staff.close();
   await page.goto(orderUrl, {waitUntil: 'networkidle'});
   await settle();
-  await screen('order-ready');
+  await screen('order-collected');
+
+  // Next visit: the same order goes back into the bag in one tap.
+  await page.goto(`${base}/menu`, {waitUntil: 'networkidle'});
+  await settle();
+  await screen('menu-order-again');
+  await page.getByRole('button', {name: /^Order again: /}).click();
+  await page.waitForURL(/\/checkout$/);
+  await page.waitForTimeout(800);
+  expect((await page.locator('[data-line]').count()) > 0, 'Order again fills the bag and opens checkout');
+  await screen('checkout-order-again');
 }
 
 await browser.close();

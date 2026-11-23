@@ -31,3 +31,22 @@ export function pickupSlots(store: Storefront, now: Date, window?: Span): Slot[]
 /** Whether `at` is still one of the offered slots; the server checks this again when the order is placed. */
 export const isOpenSlot = (store: Storefront, now: Date, at: string, window?: Span) =>
   pickupSlots(store, now, window).some((slot) => slot.at === at);
+
+/** Whether the shop's door is open at `now`, on its own clock. */
+export function isOpenAt(store: Storefront, now: Date) {
+  const clock = shopClock(store.timeZone, now);
+  const open = store.week[clock.dayIndex]?.open;
+  return open !== null && open !== undefined && clock.minutes >= toMinutes(open[0]) && clock.minutes < toMinutes(open[1]);
+}
+
+/**
+ * What a customer can count on before they reach checkout: whether the shop is open now and the
+ * soonest pick-up for what they want ("Pick-up today from 2:15pm"). Null when nothing can be
+ * picked up in the days offered.
+ */
+export function pickupPromise(store: Storefront, now: Date, window?: Span): {isOpen: boolean; soonest: string} | null {
+  const [first] = pickupSlots(store, now, window);
+  if (!first) return null;
+  const day = first.day === 'Today' || first.day === 'Tomorrow' ? first.day.toLowerCase() : first.day;
+  return {isOpen: isOpenAt(store, now), soonest: `Pick-up ${day} from ${first.time}`};
+}

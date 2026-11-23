@@ -5,6 +5,7 @@ import {CategoryRail, MenuList, Sections, StoreFooter, StoreHeader, StoreSection
 import {BagBar} from '../storefront/bag';
 import {DishSheet} from '../storefront/sheet';
 import {formatSpan} from '../storefront/hours';
+import {PickupPromise} from '../storefront/promise';
 import {storefront} from './content';
 
 /** The whole menu: a short line on how ordering works, the category rail, then every category as rows. */
@@ -16,6 +17,7 @@ export function Menu() {
           <Type role="display" as="h1">
             Menu
           </Type>
+          <PickupPromise store={storefront} />
           <Type role="body" as="p">
             Order now, collect at the counter. {storefront.hoursLine}.
             {storefront.delivery ? (

@@ -1,7 +1,7 @@
 // The customer's order after paying: a field in the colour of where it is, its code as big as
 // the page allows, the steps behind it, then when and where to collect and what is in it. It
 // follows the order by itself until it is finished.
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Link} from '@astryxdesign/core/Link';
 import {storefront} from '../site/content';
 import {formatShopTime} from '../storefront/hours';
@@ -14,11 +14,15 @@ import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {bag} from './bag';
 import {OrderTotal} from './Checkout';
-import {getOrder, type PublicOrder} from './functions';
+import {arriveForOrder, getOrder, type PublicOrder} from './functions';
 import {CUSTOMER_STEPS, customerCopy, formatRM, isDormant, isFinished, type OrderStatus} from './model';
+import {rememberOrder} from './recent';
+import {useNow} from '../storefront/now';
 import s from './orders.module.css';
 
 const POLL_MS = 4000;
+/** "I'm here" opens this long before the pick-up time: early enough for a customer who comes early, late enough that a tap at home is unlikely. */
+const ARRIVAL_OPENS_MINUTES = 45;
 /** Expired and cancelled orders are checked only now and then, for a late payment. */
 const DORMANT_POLL_MS = 60_000;
 
@@ -51,12 +55,25 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
 
   const reached = CUSTOMER_STEPS.findIndex((step) => step.status === order.status);
   const inKitchen = reached >= 0;
-  // Once the money is in, the bag has done its job.
+  // Once the money is in, the bag has done its job, and the order is one to come back to.
   useEffect(() => {
-    if (inKitchen) bag.clear();
-  }, [inKitchen]);
+    if (!inKitchen) return;
+    bag.clear();
+    rememberOrder(order);
+  }, [inKitchen, order]);
 
   const copy = customerCopy(order.status);
+  // The tab's title says where the order is, so a glance at the tabs answers "is it ready?".
+  useEffect(() => {
+    document.title = `${copy.title} · ${order.code} — ${storefront.name}`;
+  }, [copy.title, order.code]);
+  // Ready is the moment the customer waits for: a phone that can buzz, buzzes once.
+  const was = useRef(order.status);
+  useEffect(() => {
+    if (order.status === 'ready' && was.current !== 'ready') navigator.vibrate?.([120, 80, 120]);
+    was.current = order.status;
+  }, [order.status]);
+
   const ground = GROUND[order.status];
   const retry = isDormant(order.status);
 
@@ -85,6 +102,17 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
                 </li>
               ))}
             </ol>
+          ) : null}
+          {inKitchen && !finished ? <Arrival order={order} onArrived={setOrder} /> : null}
+          {order.status === 'collected' ? (
+            <Cta
+              onClick={() => {
+                bag.addAll(order.items.map(({dishId, quantity}) => ({dishId, quantity})));
+                window.location.assign('/checkout');
+              }}
+            >
+              Order the same again
+            </Cta>
           ) : null}
           {retry ? <Cta href="/checkout">Pay again</Cta> : null}
           {order.status === 'awaiting_payment' ? <Link href="/checkout">Left the payment page? Pay again from checkout</Link> : null}
@@ -116,5 +144,47 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
         </section>
       </div>
     </Page>
+  );
+}
+
+/**
+ * "I'm here": one tap at the shop and the counter's board marks the order and rings, so it is
+ * handed over without a queue. Once said, it stays said.
+ */
+function Arrival({order, onArrived}: {order: PublicOrder; onArrived: (order: PublicOrder) => void}) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const now = useNow();
+  if (!order.arrivedAt && (!now || now.getTime() < Date.parse(order.pickupAt) - ARRIVAL_OPENS_MINUTES * 60_000)) {
+    return now ? <Type role="caption" ink="secondary">When you reach the shop, open this page and tap I’m here.</Type> : null;
+  }
+  if (order.arrivedAt) {
+    return (
+      <Type role="body" as="p" className={s.arrived}>
+        The counter knows you’re here{order.status === 'ready' ? '. Your order is waiting.' : '. We’ll call your name as soon as it’s ready.'}
+      </Type>
+    );
+  }
+  return (
+    <Stack gap="xs">
+      <Cta
+        busy={busy}
+        onClick={async () => {
+          setBusy(true);
+          setFailed(false);
+          try {
+            const next = await arriveForOrder({data: {id: order.id}});
+            if (next?.arrivedAt) onArrived(next);
+            else setFailed(true);
+          } catch {
+            setFailed(true);
+          }
+          setBusy(false);
+        }}
+      >
+        I’m here
+      </Cta>
+      <Type role="caption" ink="secondary">{failed ? 'That didn’t go through. Try again, or give your code at the counter.' : 'Tap when you reach the shop, and the counter will know.'}</Type>
+    </Stack>
   );
 }

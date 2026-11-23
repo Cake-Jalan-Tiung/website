@@ -180,6 +180,8 @@ export const storefront: Storefront = {
   counter: {dishes: ['shio-pan', 'croissant', 'butter-tteok', 'latte', 'long-black']},
   // Beep's own Best Seller list, in its order.
   bestSellers: ['london-to-shah-alam', 'shio-pan', 'dubai-chewy-cookie', 'butter-tteok'],
+  // What checkout offers beside a bag, one dish from each it lacks: a drink, a bake, a slice.
+  addOns: ['drinks', 'pastries', 'small-bites', 'cakes'],
   mapHref: googleListing,
   timeZone: 'Asia/Kuala_Lumpur',
   // Assumed until the shop confirms how long an order takes to be ready.

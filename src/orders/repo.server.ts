@@ -17,12 +17,15 @@ export type OrderRow = {
   paidAt: string | null;
   /** When the sale reached the POS; null until it has. */
   posRecordedAt: string | null;
+  /** When the customer said they were at the shop; null until they have. */
+  arrivedAt: string | null;
   items: PricedLine[];
 };
 
 type OrderRecord = {
   id: string; status: string; pickup_at: string; customer_name: string; phone: string; email: string; note: string;
   total_sen: number; purchase_id: string | null; created_at: string; paid_at: string | null; pos_recorded_at: string | null;
+  arrived_at: string | null;
 };
 type ItemRecord = {order_id: string; dish_id: string; name: string; unit_sen: number; quantity: number};
 
@@ -39,6 +42,7 @@ function toRow(record: OrderRecord, items: ItemRecord[]): OrderRow {
     createdAt: record.created_at,
     paidAt: record.paid_at,
     posRecordedAt: record.pos_recorded_at,
+    arrivedAt: record.arrived_at,
     items: items.filter((item) => item.order_id === record.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
   };
 }
@@ -82,6 +86,15 @@ export function ordersRepo(db: D1Database, shopId: string) {
           db.prepare('INSERT INTO order_items (order_id, dish_id, name, unit_sen, quantity) VALUES (?, ?, ?, ?, ?)').bind(input.id, line.dishId, line.name, line.unitSen, line.quantity),
         ),
       ]);
+    },
+
+    /** The customer is at the shop. Only once, and only while the kitchen has the order. */
+    async arrive(id: string, now: Date): Promise<boolean> {
+      const result = await db
+        .prepare(`UPDATE orders SET arrived_at = ? WHERE id = ? AND shop_id = ? AND arrived_at IS NULL AND status IN (${placeholders(KITCHEN_STATUSES)})`)
+        .bind(now.toISOString(), id, shopId, ...KITCHEN_STATUSES)
+        .run();
+      return result.meta.changes > 0;
     },
 
     async attachPurchase(id: string, purchaseId: string) {

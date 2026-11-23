@@ -15,6 +15,8 @@ import {photoFor} from './photos';
 import {AddToBag, BagButton, Cta, formatPrice, PausedNotice} from './bag';
 import {OpenDish, openDish} from './sheet';
 import {Counter} from './counter';
+import {LastOrder} from './again';
+import {PickupPromise} from './promise';
 import {count as counted} from '../lib/format';
 import s from './storefront.module.css';
 
@@ -52,7 +54,12 @@ export function StoreHeader({store, mode = 'browse', onMenu = false}: {store: St
           )}
         </div>
       </Field>
-      {mode === 'browse' ? <PausedNotice /> : null}
+      {mode === 'browse' ? (
+        <>
+          <PausedNotice />
+          <LastOrder store={store} />
+        </>
+      ) : null}
     </>
   );
 }
@@ -84,7 +91,7 @@ type Ratio = '1 / 1' | '4 / 3';
  * A photo by id in a box of fixed proportions, or, until there is one, its drawing or the
  * wordmark on cream in the same box, so a grid keeps its rhythm while photos arrive.
  */
-function Media({id, cover, alt, ratio, drawing}: {id: string; cover?: string; alt: string; ratio: Ratio; drawing?: Drawing}) {
+export function Media({id, cover, alt, ratio, drawing}: {id: string; cover?: string; alt: string; ratio: Ratio; drawing?: Drawing}) {
   const src = photoFor(id, cover);
   return (
     <span className={s.media} style={{aspectRatio: ratio}}>
@@ -124,6 +131,7 @@ export function Hero({title, art, store, visual}: {title: string; art: Drawing; 
           </Type>
           <span className={s.heroActions}>
             <Cta href={store.menu.href}>Order for pick-up</Cta>
+            <PickupPromise store={store} />
           </span>
         </Stack>
         {visual || store.counter ? (
