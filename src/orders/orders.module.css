@@ -17,7 +17,7 @@
 .summary { position: sticky; top: calc(var(--store-header-h, 64px) + var(--cjt-space-md)); display: flex; flex-direction: column; gap: var(--cjt-space-sm); min-width: 0; }
 /* Held beside the form, the bag never runs past the foot of the screen: a long one scrolls inside itself, so the total stays in reach. */
 @media (min-width: 900px) {
-  .summary { max-height: calc(100svh - var(--store-header-h, 64px) - var(--cjt-space-xl)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .summary { max-height: calc(100svh - var(--store-header-h, 64px) - var(--cjt-space-xl)); overflow-y: auto; scrollbar-width: thin; }
 }
 
 .step { display: flex; flex-direction: column; gap: var(--cjt-space-md); padding-block: var(--cjt-space-lg); border-top: var(--store-heavy, 4px) solid var(--cjt-color-ink); }
