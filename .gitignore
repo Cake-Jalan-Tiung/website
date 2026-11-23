@@ -10,3 +10,6 @@ exports
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+
+# Production secrets for the first `cf deploy --secrets-file`; deleted after deploy.
+.prod.vars

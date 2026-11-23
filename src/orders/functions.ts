@@ -7,8 +7,8 @@ import {storefront} from '../site/content';
 import {isRecord, textAt} from '../lib/guards';
 import {startOfShopDay} from '../storefront/hours';
 import {paymentProvider} from '../payments/select.server';
-import type {PaymentMethod} from '../payments/provider';
-import {CartError, kitchenNext, parseCustomer, paymentDueAt, priceCart, servingWindow, statusForPayment, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import type {PaymentMethod, PaymentState} from '../payments/provider';
+import {CartError, KITCHEN_STATUSES, kitchenNext, parseCustomer, paymentDueAt, priceCart, servingWindow, statusForPayment, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import {isOpenSlot, pickupSlots, type Slot} from './pickup';
 import {ordersRepo, staffAttempts, type OrderRow} from './repo.server';
 import {STAFF_COOKIE, STAFF_SESSION_DAYS, isStaffToken, issueStaffToken, sameSecret} from './staff-session.server';
@@ -112,7 +112,7 @@ export type PublicOrder = {
 
 const toPublic = (order: OrderRow): PublicOrder => ({
   id: order.id,
-  code: order.id.slice(0, 4).toUpperCase(),
+  code: order.id.slice(0, 6).toUpperCase(),
   status: order.status,
   pickupAt: order.pickupAt,
   firstName: order.customer.name.split(/\s+/)[0],
@@ -132,8 +132,16 @@ export const getOrder = createServerFn({method: 'GET'})
     const order = await orders.get(id);
     if (!order) return null;
     if (order.status !== 'awaiting_payment' || !order.purchaseId) return toPublic(order);
+    let state: PaymentState;
+    try {
+      state = await provider().state(order.purchaseId);
+    } catch (error) {
+      // The provider is unreachable: show the order as stored; the next poll or the callback moves it.
+      console.error(error);
+      return toPublic(order);
+    }
     const now = new Date();
-    const fromProvider = statusForPayment(await provider().state(order.purchaseId));
+    const fromProvider = statusForPayment(state);
     const to = fromProvider === 'paid' || now < paymentDueAt(order.createdAt) ? fromProvider : 'expired';
     if (to && (await orders.move(id, to, now))) return toPublic({...order, status: to});
     return toPublic(order);
@@ -151,9 +159,11 @@ export const getTestPayment = createServerFn({method: 'GET'})
 // Staff ------------------------------------------------------------------------------------
 
 const MAX_FAILURES = 10;
+/** Across every address, so guessing from many IPs is slowed too. Signed-in tablets keep their session. */
+const MAX_FAILURES_EVERYWHERE = 50;
 const FAILURE_WINDOW_MINUTES = 15;
 
-const isStaff = () => isStaffToken(env.SESSION_SECRET, getCookie(STAFF_COOKIE), new Date());
+const isStaff = () => isStaffToken(env.SESSION_SECRET, env.STAFF_PIN, getCookie(STAFF_COOKIE), new Date());
 
 export const staffLogin = createServerFn({method: 'POST'})
   .validator(field('pin'))
@@ -162,14 +172,15 @@ export const staffLogin = createServerFn({method: 'POST'})
     const ip = getRequestHeader('CF-Connecting-IP') ?? 'local';
     const attempts = staffAttempts(env.DB);
     const windowStart = new Date(now.getTime() - FAILURE_WINDOW_MINUTES * 60_000);
-    if ((await attempts.recentFailures(ip, windowStart)) >= MAX_FAILURES) {
+    const [fromHere, everywhere] = await Promise.all([attempts.recentFailures(ip, windowStart), attempts.recentFailures(null, windowStart)]);
+    if (fromHere >= MAX_FAILURES || everywhere >= MAX_FAILURES_EVERYWHERE) {
       return {ok: false, message: `Too many tries. Wait ${FAILURE_WINDOW_MINUTES} minutes.`};
     }
     if (!env.STAFF_PIN || env.STAFF_PIN.length < 6 || !(await sameSecret(pin, env.STAFF_PIN))) {
       await attempts.fail(ip, now, windowStart);
       return {ok: false, message: 'That PIN is not right.'};
     }
-    setCookie(STAFF_COOKIE, await issueStaffToken(env.SESSION_SECRET, now), {
+    setCookie(STAFF_COOKIE, await issueStaffToken(env.SESSION_SECRET, env.STAFF_PIN, now), {
       httpOnly: true,
       secure: true,
       sameSite: 'strict',
@@ -186,10 +197,39 @@ export const staffLogout = createServerFn({method: 'POST'}).handler(async () => 
 
 export type StaffOrder = PublicOrder & {name: string; phone: string; note: string};
 
+/**
+ * A refund made in the provider's dashboard sends no callback, so orders on the board are
+ * checked with the provider at most once a minute each (per isolate) and leave it once refunded.
+ */
+const REFUND_CHECK_MS = 60_000;
+const refundCheckedAt = new Map<string, number>();
+
+async function withoutRefunded(board: OrderRow[], now: Date): Promise<OrderRow[]> {
+  const orders = repo();
+  const onBoard = new Set(board.map((order) => order.id));
+  for (const id of refundCheckedAt.keys()) if (!onBoard.has(id)) refundCheckedAt.delete(id);
+  const kept = await Promise.all(
+    board.map(async (order) => {
+      const purchaseId = order.purchaseId;
+      if (!purchaseId || !KITCHEN_STATUSES.includes(order.status)) return order;
+      if (now.getTime() - (refundCheckedAt.get(order.id) ?? 0) < REFUND_CHECK_MS) return order;
+      refundCheckedAt.set(order.id, now.getTime());
+      try {
+        if ((await provider().state(purchaseId)) === 'refunded' && (await orders.move(order.id, 'refunded', now))) return null;
+      } catch (error) {
+        console.error(error);
+      }
+      return order;
+    }),
+  );
+  return kept.filter((order): order is OrderRow => order !== null);
+}
+
 /** The kitchen's board: orders to make, soonest pick-up first, and those collected today. Null when signed out. */
 export const getStaffBoard = createServerFn({method: 'GET'}).handler(async (): Promise<StaffOrder[] | null> => {
   if (!(await isStaff())) return null;
-  const orders = await repo().kitchen(startOfShopDay(storefront.timeZone));
+  const now = new Date();
+  const orders = await withoutRefunded(await repo().kitchen(startOfShopDay(storefront.timeZone, now)), now);
   return orders.map((order) => ({...toPublic(order), name: order.customer.name, phone: order.customer.phone, note: order.customer.note}));
 });
 

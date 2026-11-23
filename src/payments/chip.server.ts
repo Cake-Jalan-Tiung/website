@@ -54,9 +54,9 @@ export function chipProvider({secretKey, brandId}: {secretKey: string; brandId: 
       ...init,
       headers: {Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json', ...init?.headers},
     });
-    const body: unknown = await response.json();
-    if (!response.ok) throw new Error(`CHIP ${path} failed (${response.status}): ${JSON.stringify(body)}`);
-    return body;
+    const text = await response.text();
+    if (!response.ok) throw new Error(`CHIP ${path} failed (${response.status}): ${text.slice(0, 500)}`);
+    return JSON.parse(text);
   }
 
   const methodsCache = new Map<number, {at: number; methods: Promise<PaymentMethod[]>}>();

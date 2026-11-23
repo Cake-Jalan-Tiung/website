@@ -114,8 +114,12 @@ export function ordersRepo(db: D1Database, shopId: string) {
 
 export function staffAttempts(db: D1Database) {
   return {
-    async recentFailures(ip: string, since: Date) {
-      const row = await db.prepare('SELECT COUNT(*) AS n FROM staff_login_failures WHERE ip = ? AND at >= ?').bind(ip, since.toISOString()).first<{n: number}>();
+    /** Failures since `since` from one address, or from every address when `ip` is null. */
+    async recentFailures(ip: string | null, since: Date) {
+      const query = ip === null
+        ? db.prepare('SELECT COUNT(*) AS n FROM staff_login_failures WHERE at >= ?').bind(since.toISOString())
+        : db.prepare('SELECT COUNT(*) AS n FROM staff_login_failures WHERE ip = ? AND at >= ?').bind(ip, since.toISOString());
+      const row = await query.first<{n: number}>();
       return row?.n ?? 0;
     },
     /** Records a failure and forgets those older than `keepSince`, which no lockout reads. */

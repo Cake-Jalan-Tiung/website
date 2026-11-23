@@ -1,4 +1,5 @@
-// The staff screen's session: a cookie holding its expiry and an HMAC of it, keyed by SESSION_SECRET.
+// The staff screen's session: a cookie holding its expiry and an HMAC of it and the current PIN,
+// keyed by SESSION_SECRET. Changing the PIN signs every device out.
 import {toBase64Url} from '../lib/base64';
 
 const encoder = new TextEncoder();
@@ -18,14 +19,16 @@ export async function sameSecret(a: string, b: string) {
   return diff === 0;
 }
 
-export async function issueStaffToken(secret: string, now: Date) {
-  const expires = now.getTime() + STAFF_SESSION_DAYS * 86_400_000;
-  return `${expires}.${toBase64Url(await hmac(secret, `staff.${expires}`))}`;
+const signed = (secret: string, pin: string, expires: string) => hmac(secret, `staff.${expires}.${pin}`);
+
+export async function issueStaffToken(secret: string, pin: string, now: Date) {
+  const expires = String(now.getTime() + STAFF_SESSION_DAYS * 86_400_000);
+  return `${expires}.${toBase64Url(await signed(secret, pin, expires))}`;
 }
 
-export async function isStaffToken(secret: string, token: string | undefined, now: Date) {
-  if (!secret || !token) return false;
+export async function isStaffToken(secret: string, pin: string, token: string | undefined, now: Date) {
+  if (!secret || !pin || !token) return false;
   const [expires, mac] = token.split('.');
   if (!expires || !mac || Number(expires) < now.getTime()) return false;
-  return sameSecret(mac, toBase64Url(await hmac(secret, `staff.${expires}`)));
+  return sameSecret(mac, toBase64Url(await signed(secret, pin, expires)));
 }

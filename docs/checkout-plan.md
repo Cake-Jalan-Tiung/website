@@ -16,7 +16,7 @@ Goal: customers order and pay on the shop's own site instead of Beep, in a flow 
 - **CHIP picker.** `GET /payment_methods/?brand_id&currency=MYR&amount` lists the methods (FPX, DuitNow QR `duitnow_qr`, Touch 'n Go `razer_tng`, GrabPay `razer_grabpay`, ShopeePay, cards, Apple Pay, Google Pay). Opening `checkout_url?preferred=<method>` goes straight to that method, so the method choice can live on our checkout page. From the docs, not yet tested: cards still land on CHIP's card form, and FPX probably still asks for the bank there. Direct Post (our own card form) is card-only, enabled per merchant, and widens PCI scope; not planned.
 - **CHIP webhooks.** `X-Signature` is base64 RSA PKCS#1 v1.5 over SHA-256 of the raw body. Callbacks retry up to 8 times and can arrive twice. `success_callback` rejects URLs with an explicit port, so local testing needs a tunnel.
 - **CHIP requires `client.email`** on every purchase, so checkout asks for an email (it also carries the receipt).
-- **StoreHub has no order write API.** Its API is read-only (products, customers, transactions, inventory, employees, stores, timesheets), on Advanced/Pro plans, credentials from Customer Care. Sources: StoreHub Care article on API access, and an unofficial reverse-engineered client. Pushing our orders into the POS is not possible without StoreHub building it.
+- **StoreHub can record our sales, not take kitchen orders.** StoreHub's API document (REST APIs v1.5, Nov 2019, sent with the shop's credentials) has `POST /transactions` (Add Transaction) and `POST /transactions/<refId>/cancel`, besides reads for products, customers, inventory, stores, employees and timesheets. Add Transaction records a finished Sale: `refId` (repeats are ignored), `storeId`, StoreHub `productId` per item, tax-exclusive totals, and `paymentMethod` limited to `Cash` or `CreditCard`. It has no pick-up time or order status, so the kitchen still works from `/staff`; what it gives is web sales in StoreHub's reports and stock. Host `api.storehubhq.com`, Basic auth (username `cakejalantiung`, password the API token), about 3 calls a second before rate limiting. Earlier sources (a StoreHub Care article, an unofficial client) called it read-only; the document supersedes them.
 
 ## Order model
 
@@ -46,9 +46,10 @@ Each phase ends in a check that is run, not assumed.
 1. **Start on Workers.** Done. `/`, `/menu`, `/design-system` render on the server; typecheck, 721 tests, fit 24/24, spec 32/32, `cf build`.
 2. **Pages migrated.** Done with phase 1: every HTML entry is a route, links point at `/menu`.
 3. **Cart, checkout, order page, staff screen** against the local test provider (`PAYMENTS=fake`). Done 23 Nov 2026: in the browser, added to the bag, chose a pick-up time and FPX, paid on `/pay/test/<id>`, the order appeared on `/staff` flagged as New with the count in the tab title, moved Accept → Mark ready, and the customer's page changed to Ready by itself. Also tried: a stale or edited bag, a double press on Pay (one order), Cancel payment (bag kept), Collected, Turn on sound (no errors; not heard), Sign out. Not tried: the 10-try PIN lockout. Fit 36/36 including `/checkout` and `/staff`. CHIP's signature check and request shape are unit-tested against a stub.
-4. **CHIP test mode.** Needs the client's test key and `brand_id`. Check: a test card purchase moves an order to `paid` through a signed callback.
+4. **CHIP, live.** Done 23 Nov 2026 on a live key, skipping test mode: a RM 9.00 FPX order moved to `paid` through a signed `purchase.paid` callback 38 s after it was placed. Not yet seen live: a card payment, a refund, an expiry. A refund made in CHIP's portal sends no callback; the staff board asks CHIP about each order on it at most once a minute and drops it once refunded.
 5. **Kitchen.** Done with phase 3 (staff screen). Left: the client's real PIN and a tablet to try it on.
 6. **PWA.** Manifest, icons, service worker, install prompt. Check: installs on Android and iOS, and the menu opens offline.
+7. **StoreHub sales sync** (after the CHIP launch). On `paid`, Add Transaction with the order id as `refId`; on `refunded`, Cancel Transaction. Needs each dish mapped to its StoreHub `productId`, the shop's `storeId`, and `STOREHUB_API_TOKEN` as a secret. Ask StoreHub whether custom payment options are accepted, since the document allows only `Cash`/`CreditCard`. Check: one real paid order appears in StoreHub's sales report, and its refund cancels it.
 
 ## Running it locally
 
@@ -58,14 +59,19 @@ pnpm db:migrate:local
 pnpm dev                          # /menu → bag → /checkout → /pay/test → /order/<id>; kitchen at /staff
 ```
 
-## Before the first deploy
+## Production
 
-- `cf d1 create cakejalantiung`, put its id in `cloudflare.config.ts`, apply `migrations/` remotely.
-- Set `PAYMENTS=chip`, `CHIP_SECRET_KEY`, `CHIP_BRAND_ID`, `STAFF_PIN` (6+ digits), `SESSION_SECRET` as secrets.
-- Run one CHIP test-mode purchase end to end, including the callback, on a public URL (CHIP rejects callback URLs with a port).
+- Live at `https://cakejalantiung.hazli-johar.workers.dev`, deployed with `pnpm deploy` (`cf deploy`).
+- Cloudflare account and D1 database are pinned in `cloudflare.config.ts` (`accountId`, the `DB` id): Hazli Johar's account, D1 `cakejalantiung` in APAC. Handing the site to the client means a new account id, a new D1 database with `migrations/` applied, and the secrets set again.
+- Secrets on the Worker: `PAYMENTS=chip`, `CHIP_SECRET_KEY`, `CHIP_BRAND_ID`, `STAFF_PIN` (6+ digits), `SESSION_SECRET`. Change one with `cf workers secrets update <NAME> --worker cakejalantiung`. A new `STAFF_PIN` signs every staff device out.
+- A brand-new Worker cannot hold secrets before it exists, so its first deploy is `cf deploy --secrets-file <file>`; delete the file afterwards.
+
+## Payment account
+
+Launch takes payments into HAZLI JOHAR & CO's CHIP account until the shop opens its own. Switching is two secrets, no code: `cf workers secrets update CHIP_SECRET_KEY --worker cakejalantiung` and the same for `CHIP_BRAND_ID`, with the shop's live key and brand ID.
 
 ## Waiting on the client
 
-- CHIP test secret key and `brand_id` (phase 4).
-- The staff PIN, and which tablet the kitchen will use.
+- The shop's own CHIP account, to replace HAZLI JOHAR & CO's (see Payment account).
+- The shop's staff PIN (a placeholder PIN is set now), and which tablet the kitchen will use.
 - Pick-up lead time: how many minutes from paying to ready.

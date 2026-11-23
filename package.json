@@ -18,7 +18,7 @@
     "export": "node scripts/export.mjs",
     "test": "vitest run",
     "deploy": "cf deploy",
-    "db:migrate:local": "cf d1 migrations apply 00000000-0000-4000-8000-00000000c1d1 --local"
+    "db:migrate:local": "cf d1 migrations apply 9f1ccf1f-02eb-47eb-be65-c20274559efe --local"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.17",
