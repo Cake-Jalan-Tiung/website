@@ -58,7 +58,7 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
   // Once the money is in, the bag that paid for it has done its job, and the order is one to come back to.
   useEffect(() => {
     if (!inKitchen) return;
-    rememberOrder(order, settleBag(order.id));
+    rememberOrder(order, settleBag(order.id) !== null);
     // The order's id, code, pick-up and items never change, so its first paid sighting is the one that counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inKitchen, order.id]);

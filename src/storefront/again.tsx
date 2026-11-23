@@ -2,11 +2,12 @@
 // order is in the kitchen it leads to that order's page; once it is done, the same order goes
 // back into the bag in one tap and checkout opens.
 import {useEffect, useState, type ReactNode} from 'react';
-import {bag, forgetPaying, payingIds, settleBag} from '../orders/bag';
+import {bag} from '../orders/bag';
+import {settlePaying} from '../orders/settle';
 import {useAvailability} from '../orders/availability-store';
 import {getOrder, type PublicOrder} from '../orders/functions';
-import {CUSTOMER_STEPS, customerCopy, formatRM, isDormant, isFinished, orderableDish} from '../orders/model';
-import {orderAgainLines, rememberOrder, useRecentOrder, type RecentOrder} from '../orders/recent';
+import {CUSTOMER_STEPS, customerCopy, formatRM, isFinished, orderableDish} from '../orders/model';
+import {orderAgainLines, useRecentOrder, type RecentOrder} from '../orders/recent';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
 import {Type} from '../system/Type';
@@ -42,24 +43,14 @@ function useTracked(recent: RecentOrder | null) {
   return answer && answer.id === id ? answer.order : undefined;
 }
 
-/**
- * A payment whose page never came back (a bank app that kept the customer) still settles: the
- * next page asks after each order this device went to pay for, so a paid bag empties and the
- * order appears here, and a second payment for the same food is not invited.
- */
+/** Settles payments that never came back to their page, once per page and again when it returns to view. */
 function useSettlePaying() {
   useEffect(() => {
-    for (const id of payingIds()) {
-      getOrder({data: {id}}).then(
-        (order) => {
-          if (!order) return forgetPaying(id);
-          if (CUSTOMER_STEPS.some((step) => step.status === order.status)) return rememberOrder(order, settleBag(id));
-          // Unpaid long past its pick-up time: nothing more will come of it.
-          if ((isDormant(order.status) || order.status === 'refunded') && Date.now() > Date.parse(order.pickupAt)) forgetPaying(id);
-        },
-        () => undefined,
-      );
-    }
+    const settle = () => void settlePaying();
+    settle();
+    const onVisible = () => document.visibilityState === 'visible' && settle();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 }
 

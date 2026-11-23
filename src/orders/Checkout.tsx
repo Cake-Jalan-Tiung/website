@@ -23,6 +23,7 @@ import {Type} from '../system/Type';
 import {bag, countOf, payingFor, useBag, useBagReady} from './bag';
 import {TEST_DISH, customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
 import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
+import {settlePaying} from './settle';
 import type {PaymentMethod} from '../payments/provider';
 import s from './orders.module.css';
 
@@ -154,15 +155,29 @@ export function Checkout() {
   const [checked, setChecked] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  // Back from the payment page, a phone may restore this page as it was left: Pay pressed.
+  // If this bag has been paid for already (the payment page never came back here), the customer
+  // goes to that order instead of being offered Pay again. Asked on arrival, when a phone
+  // restores this page from Back, and when the tab returns to view.
   useEffect(() => {
+    const check = () =>
+      void settlePaying().then((order) => {
+        if (order) window.location.replace(`/order/${order.id}`);
+      });
+    // Back from the payment page, a phone may restore this page as it was left: Pay pressed.
     const restore = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
       submitting.current = false;
       setPlacing(false);
+      check();
     };
+    const onVisible = () => document.visibilityState === 'visible' && check();
+    check();
     window.addEventListener('pageshow', restore);
-    return () => window.removeEventListener('pageshow', restore);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('pageshow', restore);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -398,7 +413,7 @@ export function Checkout() {
               <Cta onClick={retry}>Try again</Cta>
             ) : (
               <Cta type="submit" busy={placing} isDisabled={!pricedNow || slots.length === 0 || loadError !== null}>
-                {placing ? 'Opening payment…' : options && pricedNow ? `Pay ${formatRM(options.cart.totalSen)}` : options ? 'Updating total…' : 'Pay'}
+                {placing ? 'Opening payment…' : options && pricedNow ? `Pay ${formatRM(options.cart.totalSen)}` : options && loadError === null ? 'Updating total…' : 'Pay'}
               </Cta>
             )}
             {activeSlot ? <Type role="caption" ink="secondary">Pick-up {activeSlot.day}, {activeSlot.time}</Type> : null}

@@ -138,13 +138,16 @@ export const payingIds = () => (typeof window === 'undefined' ? [] : readPaying(
 export const forgetPaying = (orderId: string) => writePaying(readPaying().filter((entry) => entry.id !== orderId));
 
 /**
- * Called once `orderId` is paid. True when this device went to pay for it: the wait is over, and
- * the bag empties if it is still the bag that was paid for.
+ * Called once `orderId` is paid. Null when this device did not go to pay for it; otherwise the
+ * wait for it and for any retry of the same bag is over, and the bag empties if it is still the
+ * bag that was paid for ('cleared') or stays as the customer's next order ('kept').
  */
-export function settleBag(orderId: string): boolean {
-  const entry = readPaying().find((paying) => paying.id === orderId);
-  if (!entry) return false;
-  writePaying([]);
-  if (sameLines(load(), entry.lines)) bag.clear();
-  return true;
+export function settleBag(orderId: string): 'cleared' | 'kept' | null {
+  const all = readPaying();
+  const entry = all.find((paying) => paying.id === orderId);
+  if (!entry) return null;
+  writePaying(all.filter((paying) => paying.id !== orderId && !sameLines(paying.lines, entry.lines)));
+  if (!sameLines(load(), entry.lines)) return 'kept';
+  bag.clear();
+  return 'cleared';
 }

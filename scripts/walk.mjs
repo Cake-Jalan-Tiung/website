@@ -210,6 +210,17 @@ if (process.env.WALK_STAFF_PIN) {
   await page.waitForTimeout(800);
   expect((await page.evaluate(() => localStorage.getItem('cjt.bag.v1'))) === reordered, 'a second Order again does not double the bag');
   await screen('checkout-order-again');
+
+  // Paid, but the payment page never comes back to the order (a bank app kept the customer).
+  // Back at checkout, the customer is taken to the paid order instead of being offered Pay again.
+  await pay();
+  await page.route(/\/order\//, (route) => route.abort());
+  await page.getByRole('button', {name: /^Pay$/}).click();
+  await page.waitForTimeout(1500);
+  await page.unroute(/\/order\//);
+  await page.goto(`${base}/checkout`, {waitUntil: 'networkidle'});
+  expect(await page.waitForURL(/\/order\//, {timeout: 8000}).then(() => true, () => false), 'checkout sends a bag already paid for to its order');
+  expect((await page.evaluate(() => localStorage.getItem('cjt.bag.v1'))) === '[]', 'the bag that was paid for is empty');
 }
 
 await browser.close();
