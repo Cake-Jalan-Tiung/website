@@ -59,8 +59,7 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
   // Once the money is in, the bag that paid for it has done its job, and the order is one to come back to.
   useEffect(() => {
     if (!inKitchen) return;
-    settleBag(order.id);
-    rememberOrder(order);
+    rememberOrder(order, settleBag(order.id));
     // The order's id, code, pick-up and items never change, so its first paid sighting is the one that counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inKitchen, order.id]);
@@ -159,37 +158,41 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
 function Arrival({order, onArrived}: {order: PublicOrder; onArrived: (order: PublicOrder) => void}) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const said = useRef<HTMLParagraphElement>(null);
   const now = useNow();
-  if (!order.arrivedAt && (!now || now.getTime() < Date.parse(order.pickupAt) - ARRIVAL_OPENS_MINUTES * 60_000)) {
-    return now ? <Type role="caption" ink="secondary">When you reach the shop, open this page and tap I’m here.</Type> : null;
-  }
-  if (order.arrivedAt) {
-    return (
-      <Type role="body" as="p" className={s.arrived}>
-        The counter knows you’re here{order.status === 'ready' ? '. Your order is waiting.' : '. We’ll call your name as soon as it’s ready.'}
-      </Type>
-    );
-  }
+  if (!now) return null;
+  const open = now.getTime() >= Date.parse(order.pickupAt) - ARRIVAL_OPENS_MINUTES * 60_000;
+  const arrive = async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const next = await arriveForOrder({data: {id: order.id}});
+      if (next?.arrivedAt) {
+        onArrived(next);
+        // The button goes once it has been said, so focus moves to what replaced it.
+        requestAnimationFrame(() => said.current?.focus());
+      } else setFailed(true);
+    } catch {
+      setFailed(true);
+    }
+    setBusy(false);
+  };
   return (
     <Stack gap="xs">
-      <Cta
-        busy={busy}
-        onClick={async () => {
-          setBusy(true);
-          setFailed(false);
-          try {
-            const next = await arriveForOrder({data: {id: order.id}});
-            if (next?.arrivedAt) onArrived(next);
-            else setFailed(true);
-          } catch {
-            setFailed(true);
-          }
-          setBusy(false);
-        }}
-      >
-        I’m here
-      </Cta>
-      <Type role="caption" ink="secondary">{failed ? 'That didn’t go through. Try again, or give your code at the counter.' : 'Tap when you reach the shop, and the counter will know.'}</Type>
+      {!order.arrivedAt && open ? <Cta busy={busy} onClick={arrive}>I’m here</Cta> : null}
+      {/* Rendered before the tap, so its words are announced when they arrive. */}
+      <p role="status" ref={said} tabIndex={-1} className={s.said}>
+        {order.arrivedAt ? (
+          <Type role="body" className={s.arrived}>
+            The counter knows you’re here. {order.status === 'ready' ? 'Your order is waiting.' : 'We’ll call your name as soon as it’s ready.'}
+          </Type>
+        ) : null}
+      </p>
+      {order.arrivedAt ? null : (
+        <Type role="caption" ink="secondary">
+          {failed ? 'That didn’t go through. Try again, or give your code at the counter.' : open ? 'Tap when you reach the shop, and the counter will know.' : 'When you reach the shop, open this page and tap I’m here.'}
+        </Type>
+      )}
     </Stack>
   );
 }

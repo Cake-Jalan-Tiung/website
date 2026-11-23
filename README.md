@@ -21,9 +21,10 @@ Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or
 | --- | --- |
 | Menu built for a phone: a category rail, one-tap + on every photo, a sheet for each dish | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
 | A bag pinned to the foot of the screen that survives closing the tab | Pause online ordering for today, or until resumed |
-| Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered | Mark dishes sold out until tomorrow |
+| Open now and the soonest pick-up shown on the menu and the bag bar, before checkout | Mark dishes sold out until tomorrow |
+| Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered, one optional row of add-ons | A customer who taps I'm here goes to the top of the board, in pink, with a ring |
 | Payment through [CHIP](https://www.chip-in.asia) (FPX, DuitNow QR, Touch 'n Go, GrabPay, cards) | Paid orders recorded as sales in StoreHub, cancelled on refund, with each order's StoreHub state on the kitchen screen |
-| An order page that follows the order to Ready | An RM 1 staff test order to try real payments end to end |
+| An order page that follows the order to Ready, with I'm here near pick-up time; the last order one tap from every page, to track or to order again | An RM 1 staff test order to try real payments end to end |
 | Delivery still through Beep | Failure alerts by email |
 
 ## How it works

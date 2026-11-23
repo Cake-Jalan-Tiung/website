@@ -62,6 +62,8 @@ Each phase ends in a check that is run, not assumed.
 9. **Pause and sold out.** `/staff` → Online ordering: pause for today or until resumed, and switch dishes sold out until the next shop day (`closures` table, `src/orders/availability.ts`). The menu shows Sold out and a paused banner; checkout refuses either on the server.
 10. **Settling and alerts.** The same 5-minute cron asks CHIP about every order still awaiting payment: a payment whose callback was lost moves to paid, and an order past its window expires. Failures are emailed to `ALERT_TO` from `alerts@hazli.dev` (`src/ops/alert.server.ts`), each kind at most once per 6 hours: a callback that throws or names no order, money found without its callback, CHIP unreachable, a StoreHub record or cancel failing, a checkout error. Email needs Email Sending enabled on hazli.dev; until then alerts reach only the Worker's log.
 
+11. **Returning and arriving customers.** Built 24 Nov 2026, after Domino's carryout (tracker, Easy Order, Pie Pass check-in). The menu, the hero and the bag bar say whether the shop is open and the soonest pick-up for what is in the bag. The last paid order is kept on the device (`cjt.recent.v1`, `src/orders/recent.ts`): while it is in the kitchen every browsing page leads back to it; once done, Order again raises the bag to that order and opens checkout, and repeating it changes nothing. Checkout offers one optional row of add-ons, one dish from each add-on category the bag lacks (`addOns` in `content.ts`), set when checkout opens. From 45 minutes before pick-up the order page has I'm here: `/staff` marks the ticket in pink, puts it first in its column and rings (`arrived_at`, migration 0007). The bag empties only when the order it went to pay for is paid (`cjt.paying.v1`). Checked: unit tests for the pick-up promise, add-on choice, remembered order and reorder lines; `pnpm walk` asserts each step on a phone, with I'm here under a clock set ten minutes before pick-up.
+
 ## Running it locally
 
 ```bash
@@ -74,6 +76,7 @@ pnpm dev                          # /menu → bag → /checkout → /pay/test �
 
 - Live at `https://cakejalantiung.app` (and `www.`), with `https://cakejalantiung.hazli-johar.workers.dev` still serving, deployed with `pnpm deploy` (`cf deploy`).
 - Cloudflare account and D1 database are pinned in `cloudflare.config.ts` (`accountId`, the `DB` id): Hazli Johar's account, D1 `cakejalantiung` in APAC. Handing the site to the client means a new account id, a new D1 database with `migrations/` applied, and the secrets set again.
+- Migration `0007_arrivals.sql` must be applied to the production D1 before the code that writes `arrived_at` is deployed, the same way as 0006.
 - Migration `0006_refund_checks.sql` must be applied to the production D1 (`pnpm exec cf d1 migrations apply 9f1ccf1f-02eb-47eb-be65-c20274559efe`) before the code that reads `refund_checked_at` is deployed.
 - Secrets on the Worker: `PAYMENTS=chip`, `CHIP_SECRET_KEY`, `CHIP_BRAND_ID`, `STAFF_PIN` (6+ digits), `SESSION_SECRET`, `STOREHUB_API_TOKEN`, `ALERT_TO`. Change one with `cf workers secrets update <NAME> --worker cakejalantiung`. A new `STAFF_PIN` signs every staff device out.
 - A brand-new Worker cannot hold secrets before it exists, so its first deploy is `cf deploy --secrets-file <file>`; delete the file afterwards.

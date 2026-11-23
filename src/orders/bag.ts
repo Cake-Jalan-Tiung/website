@@ -119,9 +119,13 @@ export function payingFor(orderId: string) {
   window.localStorage.setItem(PAYING_KEY, JSON.stringify([orderId, ...readPaying().filter((id) => id !== orderId)].slice(0, PAYING_KEPT)));
 }
 
-/** The order page calls this once `orderId` is paid: if this bag went to pay for it, the bag has done its job. */
-export function settleBag(orderId: string) {
-  if (!readPaying().includes(orderId)) return;
+/**
+ * The order page calls this once `orderId` is paid: if this bag went to pay for it, the bag has
+ * done its job and empties. True only then, the moment this device has just paid for it.
+ */
+export function settleBag(orderId: string): boolean {
+  if (!readPaying().includes(orderId)) return false;
   window.localStorage.removeItem(PAYING_KEY);
   bag.clear();
+  return true;
 }

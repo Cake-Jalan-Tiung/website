@@ -53,13 +53,14 @@ const subscribe = (listener: () => void) => {
 export const useRecentOrder = () => useSyncExternalStore(subscribe, load, () => null);
 
 /**
- * Remembers a paid order, unless a later one is remembered already (an old receipt's link opened
- * again). A staff test order is never remembered: it is not something to order again.
+ * Remembers a paid order: always the one this device has `justPaid` for, otherwise only when none
+ * is remembered, so opening an old receipt's link never displaces the latest. A staff test order
+ * is never remembered: it is not something to order again.
  */
-export function rememberOrder(order: {id: string; code: string; pickupAt: string; items: readonly CartLine[]}) {
+export function rememberOrder(order: {id: string; code: string; pickupAt: string; items: readonly CartLine[]}, justPaid: boolean) {
   if (order.items.some((item) => item.dishId === TEST_DISH.id)) return;
   const known = load();
-  if (known && (known.id === order.id || Date.parse(known.pickupAt) > Date.parse(order.pickupAt))) return;
+  if (known?.id === order.id || (known && !justPaid)) return;
   const next: RecentOrder = {id: order.id, code: order.code, pickupAt: order.pickupAt, lines: order.items.map(({dishId, quantity}) => ({dishId, quantity}))};
   window.localStorage.setItem(KEY, JSON.stringify(next));
   recent = parseRecent(JSON.stringify(next));

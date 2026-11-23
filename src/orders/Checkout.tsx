@@ -21,7 +21,7 @@ import {count as counted, list} from '../lib/format';
 import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {bag, countOf, payingFor, useBag, useBagReady} from './bag';
-import {customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
+import {TEST_DISH, customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
 import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
 import type {PaymentMethod} from '../payments/provider';
 import s from './orders.module.css';
@@ -90,7 +90,8 @@ function AddOns({lines}: {lines: readonly CartLine[]}) {
   const [offered] = useState(() => suggestionsFor(storefront, lines, (id) => photoFor(id) !== undefined));
   const inBag = new Set(lines.map((line) => line.dishId));
   const shown = offered.filter((dish) => !inBag.has(dish.id) && !soldOut[dish.id]);
-  if (ordersPaused || shown.length === 0) return null;
+  // The staff test item sits alone in its cart, so nothing is offered beside it.
+  if (ordersPaused || inBag.has(TEST_DISH.id) || shown.length === 0) return null;
   return (
     <section className={s.addOns} aria-labelledby="add-ons">
       <Label ink="secondary" as="h3" id="add-ons">Add to your order</Label>

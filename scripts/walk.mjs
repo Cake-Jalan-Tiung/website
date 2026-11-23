@@ -167,7 +167,8 @@ await page.goto(orderUrl, {waitUntil: 'networkidle'});
 await settle();
 await page.getByRole('button', {name: 'I’m here'}).click();
 await page.waitForTimeout(800);
-expect((await page.getByText('The counter knows you’re here').count()) === 1, 'I’m here is acknowledged');
+expect((await page.getByRole('status').filter({hasText: 'The counter knows you’re here'}).count()) === 1, 'I’m here is acknowledged in a status');
+expect(await page.getByRole('status').evaluate((el) => el === document.activeElement), 'focus moves to the acknowledgement');
 await screen('order-arrived');
 
 if (process.env.WALK_STAFF_PIN) {
@@ -185,10 +186,8 @@ if (process.env.WALK_STAFF_PIN) {
   await ticket.getByRole('button', {name: 'Accept'}).click();
   await staff.waitForTimeout(1000);
   await ticket.getByRole('button', {name: 'Mark ready'}).click();
-  await staff.waitForTimeout(1000);
-  await page.goto(orderUrl, {waitUntil: 'networkidle'});
-  await settle();
-  expect((await page.title()).startsWith('Ready to collect'), 'the tab title says the order is ready');
+  // The customer's page, left open, follows by itself: no reload.
+  expect(await page.waitForFunction(() => document.title.startsWith('Ready to collect'), null, {timeout: 8000}).then(() => true, () => false), 'the open order page turns Ready by itself, title and all');
   await screen('order-ready');
   await ticket.getByRole('button', {name: 'Collected'}).click();
   await staff.waitForTimeout(1000);

@@ -143,6 +143,8 @@
 .ticket[data-ground='blue'] { color: var(--cjt-color-cream-400); }
 .ticketInner { display: flex; flex-direction: column; gap: var(--cjt-space-md); box-sizing: border-box; max-width: var(--cjt-container-content); margin-inline: auto; padding-inline: var(--cjt-space-gutter); }
 .arrived { font-weight: var(--cjt-weight-medium); }
+.said { margin: 0; }
+.said:focus { outline: none; }
 .bigCode { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
 .progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cjt-space-xl)), 1fr)); gap: var(--cjt-space-xs); margin: 0; padding: 0; list-style: none; }
 .progress li { display: flex; flex-direction: column; gap: var(--cjt-space-xs); padding-top: var(--cjt-space-sm); border-top: var(--store-heavy, 4px) solid color-mix(in srgb, currentColor 20%, transparent); }
