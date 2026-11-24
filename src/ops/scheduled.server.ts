@@ -2,7 +2,7 @@
 // refunds made in the provider's dashboard, send order emails still owed, then keep the POS in
 // step. Each step runs even when the one before it failed.
 import {ordersRepo} from '../orders/repo.server';
-import {orderCode, settledStatus} from '../orders/model';
+import {LATE_PAYMENT_HOURS, orderCode, statusAfterAsking} from '../orders/model';
 import {paymentProvider} from '../payments/select.server';
 import type {PaymentState} from '../payments/provider';
 import {syncPosSales} from '../pos/sync.server';
@@ -15,14 +15,15 @@ type ScheduledEnv = {DB: D1Database; SHOP_ID: string; PAYMENTS: string; CHIP_SEC
 const PER_RUN = 20;
 
 /**
- * Asks the provider about every order still waiting for payment. Money that arrived without its
- * callback moves the order to paid (and onto the kitchen board), and an order whose payment
+ * Asks the provider about every order still waiting for payment, and for a few hours about those
+ * that expired or were cancelled. Money that arrived without its callback moves the order to paid
+ * (and onto the kitchen board), even when it came after the window closed; an order whose payment
  * window has passed expires, so nothing is left waiting because a customer closed the page.
  */
 export async function settleUnpaid(env: ScheduledEnv, now: Date = new Date()) {
   const orders = ordersRepo(env.DB, env.SHOP_ID);
   const provider = paymentProvider(env);
-  for (const order of await orders.awaitingPayment(PER_RUN)) {
+  for (const order of await orders.awaitingMoney(new Date(now.getTime() - LATE_PAYMENT_HOURS * 3_600_000), PER_RUN)) {
     let state: PaymentState = 'pending';
     if (order.purchaseId) {
       try {
@@ -36,7 +37,7 @@ export async function settleUnpaid(env: ScheduledEnv, now: Date = new Date()) {
         continue;
       }
     }
-    const to = settledStatus(state, order.createdAt, now);
+    const to = statusAfterAsking(order.status, state, order.createdAt, now);
     if (to && (await orders.move(order.id, to, now)) && to === 'paid') {
       await sendAlert({
         key: `callback-missed:${order.id}`,

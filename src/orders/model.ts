@@ -174,6 +174,22 @@ export function settledStatus(state: PaymentState, createdAt: string, now: Date)
   return fromProvider === 'paid' || now < paymentDueAt(createdAt) ? fromProvider : 'expired';
 }
 
+/**
+ * How long after it was placed an expired or cancelled order is still asked about: a bank payment
+ * can land after the window closed, and its callback can be lost. Past this, only a callback moves it.
+ */
+export const LATE_PAYMENT_HOURS = 3;
+
+/** Whether the provider should be asked about this order: it waits for payment, or late money could still arrive. */
+export const awaitsMoney = (status: OrderStatus, createdAt: string, now: Date) =>
+  status === 'awaiting_payment' || (isDormant(status) && now.getTime() < Date.parse(createdAt) + LATE_PAYMENT_HOURS * 3_600_000);
+
+/** Where an order the provider was asked about goes: an unpaid one settles; a dormant one moves only for money that arrived. */
+export function statusAfterAsking(status: OrderStatus, state: PaymentState, createdAt: string, now: Date): OrderStatus | null {
+  if (isDormant(status)) return statusForPayment(state) === 'paid' ? 'paid' : null;
+  return status === 'awaiting_payment' ? settledStatus(state, createdAt, now) : null;
+}
+
 // Customers ----------------------------------------------------------------------------------
 
 export type Customer = {name: string; phone: string; email: string; note: string};

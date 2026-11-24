@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
-import {CartError, PAYMENT_WINDOW_MINUTES, TEST_DISH, canMove, customerProblems, isFinished, parseCustomer, priceCart, servingWindow} from './model';
+import {CartError, LATE_PAYMENT_HOURS, PAYMENT_WINDOW_MINUTES, TEST_DISH, awaitsMoney, canMove, statusAfterAsking, customerProblems, isFinished, parseCustomer, priceCart, servingWindow} from './model';
 import {parseBag} from './bag';
 import {isOpenSlot, pickupPromise, pickupSlots} from './pickup';
 import {orderAgainLines, parseRecent} from './recent';
@@ -200,5 +200,30 @@ describe('the staff test order', () => {
 
   it('is on no menu', () => {
     expect(storefront.categories.some((category) => category.dishes.some((dish) => dish.id === TEST_DISH.id))).toBe(false);
+  });
+});
+
+describe('late payments', () => {
+  const placed = '2026-11-24T02:00:00.000Z';
+  const later = (minutes: number) => new Date(Date.parse(placed) + minutes * 60_000);
+
+  it('moves an expired or cancelled order to paid when the money arrives, and nowhere else', () => {
+    for (const status of ['expired', 'cancelled'] as const) {
+      expect(statusAfterAsking(status, 'paid', placed, later(90)), status).toBe('paid');
+      for (const state of ['pending', 'expired', 'failed', 'refunded'] as const) expect(statusAfterAsking(status, state, placed, later(90)), `${status} ${state}`).toBeNull();
+    }
+  });
+
+  it('settles an unpaid order as before, and leaves a sold one alone', () => {
+    expect(statusAfterAsking('awaiting_payment', 'pending', placed, later(PAYMENT_WINDOW_MINUTES + 1))).toBe('expired');
+    expect(statusAfterAsking('awaiting_payment', 'paid', placed, later(1))).toBe('paid');
+    expect(statusAfterAsking('accepted', 'refunded', placed, later(30))).toBeNull();
+  });
+
+  it('asks about a dormant order only for the first few hours', () => {
+    expect(awaitsMoney('expired', placed, later(LATE_PAYMENT_HOURS * 60 - 1))).toBe(true);
+    expect(awaitsMoney('cancelled', placed, later(LATE_PAYMENT_HOURS * 60))).toBe(false);
+    expect(awaitsMoney('awaiting_payment', placed, later(24 * 60))).toBe(true);
+    expect(awaitsMoney('paid', placed, later(1))).toBe(false);
   });
 });

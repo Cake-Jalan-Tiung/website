@@ -143,13 +143,24 @@ export function ordersRepo(db: D1Database, shopId: string) {
       return true;
     },
 
-    /** Orders still waiting for payment, oldest first: what the scheduled sweep settles. */
-    async awaitingPayment(limit: number): Promise<{id: string; purchaseId: string | null; createdAt: string}[]> {
+    /**
+     * What the scheduled sweep asks the provider about: orders still waiting for payment, then
+     * expired or cancelled ones placed since `lateSince` that late money could still reach,
+     * oldest first within each.
+     */
+    async awaitingMoney(lateSince: Date, limit: number): Promise<{id: string; status: OrderStatus; purchaseId: string | null; createdAt: string}[]> {
       const rows = await db
-        .prepare(`SELECT id, purchase_id, created_at FROM orders WHERE shop_id = ? AND status = 'awaiting_payment' ORDER BY created_at LIMIT ?`)
-        .bind(shopId, limit)
-        .all<{id: string; purchase_id: string | null; created_at: string}>();
-      return rows.results.map((row) => ({id: row.id, purchaseId: row.purchase_id, createdAt: row.created_at}));
+        .prepare(
+          `SELECT id, status, purchase_id, created_at FROM orders WHERE shop_id = ? AND (status = 'awaiting_payment'
+             OR (status IN ('expired', 'cancelled') AND purchase_id IS NOT NULL AND created_at >= ?))
+           ORDER BY status != 'awaiting_payment', created_at LIMIT ?`,
+        )
+        .bind(shopId, lateSince.toISOString(), limit)
+        .all<{id: string; status: string; purchase_id: string | null; created_at: string}>();
+      return rows.results.flatMap((row) => {
+        const status = ORDER_STATUSES.find((s) => s === row.status);
+        return status ? [{id: row.id, status, purchaseId: row.purchase_id, createdAt: row.created_at}] : [];
+      });
     },
 
     /**

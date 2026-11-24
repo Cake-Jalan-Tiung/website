@@ -9,7 +9,7 @@ import {startOfShopDay} from '../storefront/hours';
 import {paymentProvider} from '../payments/select.server';
 import {alertLater} from '../ops/alert.server';
 import type {PaymentMethod, PaymentState} from '../payments/provider';
-import {CartError, KITCHEN_STATUSES, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, settledStatus, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import {CartError, KITCHEN_STATUSES, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, awaitsMoney, statusAfterAsking, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import {isOpenSlot, pickupSlots, type Slot} from './pickup';
 import {closuresRepo, ordersRepo, staffAttempts, type OrderRow} from './repo.server';
 import {notifyLater} from './notify.server';
@@ -168,7 +168,8 @@ const toPublic = (order: OrderRow): PublicOrder => ({
 /**
  * One order, for its customer. While it waits for payment it asks the provider directly, so
  * the page is right even when a callback is late or lost, and expires once its due time has
- * passed without payment.
+ * passed without payment. An expired or cancelled one keeps asking for a few hours, as its page
+ * promises, in case the money arrives late.
  */
 export const getOrder = createServerFn({method: 'GET'})
   .validator(field('id'))
@@ -176,7 +177,8 @@ export const getOrder = createServerFn({method: 'GET'})
     const orders = repo();
     const order = await orders.get(id);
     if (!order) return null;
-    if (order.status !== 'awaiting_payment' || !order.purchaseId) return toPublic(order);
+    const now = new Date();
+    if (!order.purchaseId || !awaitsMoney(order.status, order.createdAt, now)) return toPublic(order);
     let state: PaymentState;
     try {
       state = await provider().state(order.purchaseId);
@@ -185,8 +187,7 @@ export const getOrder = createServerFn({method: 'GET'})
       console.error(error);
       return toPublic(order);
     }
-    const now = new Date();
-    const to = settledStatus(state, order.createdAt, now);
+    const to = statusAfterAsking(order.status, state, order.createdAt, now);
     if (!to || !(await orders.move(id, to, now))) return toPublic(order);
     notifyLater(id);
     return toPublic({...order, status: to});
