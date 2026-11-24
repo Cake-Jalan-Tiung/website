@@ -32,11 +32,12 @@ function deps(target: NotifyEnv, now: Date): NotifyDeps {
           .prepare(
             `INSERT INTO order_emails (order_id, kind, state, attempts, updated_at) VALUES (?, ?, 'sending', 1, ?)
              ON CONFLICT (order_id, kind) DO UPDATE SET state = 'sending', attempts = order_emails.attempts + 1, updated_at = excluded.updated_at
-             WHERE order_emails.attempts < ? AND (order_emails.state = 'failed' OR (order_emails.state = 'sending' AND order_emails.updated_at < ?))`,
+             WHERE order_emails.attempts < ? AND (order_emails.state = 'failed' OR (order_emails.state = 'sending' AND order_emails.updated_at < ?))
+             RETURNING attempts`,
           )
           .bind(orderId, kind, at.toISOString(), EMAIL_ATTEMPTS, minutesBefore(at, EMAIL_CLAIM_MINUTES))
-          .run();
-        return result.meta.changes > 0;
+          .first<{attempts: number}>();
+        return result?.attempts ?? null;
       },
       async finish(orderId, kind, outcome, at) {
         await db.prepare('UPDATE order_emails SET state = ?, updated_at = ? WHERE order_id = ? AND kind = ?').bind(outcome, at.toISOString(), orderId, kind).run();
@@ -52,8 +53,11 @@ function deps(target: NotifyEnv, now: Date): NotifyDeps {
   };
 }
 
-/** Sends this order's due emails after the response, for code that runs inside a request. */
-export const notifyLater = (orderId: string) => waitUntil(notifyOrder(orderId, deps(env, new Date())));
+/**
+ * Sends this order's due emails after the response, for code that runs inside a request. Built
+ * inside the promise, so not even a misconfigured binding can throw into the request that asked.
+ */
+export const notifyLater = (orderId: string) => waitUntil(Promise.resolve().then(() => notifyOrder(orderId, deps(env, new Date()))).catch((error: unknown) => console.error('Order emails not sent', error)));
 
 /**
  * The 5-minute job: orders that may still be owed an email, by the same rules as `ORDER_EMAILS`

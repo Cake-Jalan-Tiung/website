@@ -16,8 +16,8 @@ export type NotifyDeps = {
   /** The order as it is now, with the address to write to; null when there is none. */
   order(id: string): Promise<(EmailOrder & {email: string}) | null>;
   emails: {
-    /** Takes the right to send; false when it is sent, being sent, given up or never to be sent. */
-    claim(orderId: string, kind: OrderEmailKind, now: Date): Promise<boolean>;
+    /** Takes the right to send and says which attempt this is; null when it is sent, being sent, given up or never to be sent. */
+    claim(orderId: string, kind: OrderEmailKind, now: Date): Promise<number | null>;
     finish(orderId: string, kind: OrderEmailKind, outcome: 'sent' | 'failed', now: Date): Promise<void>;
   };
   send(to: string, email: OrderEmail): Promise<void>;
@@ -33,23 +33,36 @@ export async function notifyOrder(id: string, deps: NotifyDeps): Promise<void> {
     const order = await deps.order(id);
     if (!order) return;
     for (const kind of ORDER_EMAIL_KINDS) {
-      if (!ORDER_EMAILS[kind].isDue(order) || !(await deps.emails.claim(order.id, kind, deps.now))) continue;
+      if (!ORDER_EMAILS[kind].isDue(order)) continue;
+      const attempt = await deps.emails.claim(order.id, kind, deps.now);
+      if (attempt === null) continue;
       let failure: unknown = null;
       try {
         await deps.send(order.email, orderEmail(kind, order, deps.store, deps.origin));
       } catch (error) {
         failure = error ?? 'unknown error';
       }
-      // A send that failed is released for the 5-minute job; one that went is recorded as sent.
+      // A send that failed is released for the 5-minute job; one that went is recorded as sent. Should
+      // that write fail, the claim lapses and the email can go twice: rarer and kinder than never.
       await deps.emails.finish(order.id, kind, failure === null ? 'sent' : 'failed', deps.now);
       if (failure === null) continue;
       // The address stays out of the alert: only the order code identifies the customer there.
       const reason = String(failure).replaceAll(order.email, '<customer address>');
-      await deps.alert({
-        key: `order-email:${kind}`,
-        subject: `A customer's "${kind}" email did not send`,
-        body: `The "${kind}" email for order ${orderCode(order.id)} failed: ${reason}\n\nThe 5-minute job tries again, ${EMAIL_ATTEMPTS} sends at most. The order itself is unaffected.`,
-      });
+      const code = orderCode(order.id);
+      // Retries share one alert, held back for hours; giving up is alerted for each order, since that customer has no email.
+      await deps.alert(
+        attempt < EMAIL_ATTEMPTS
+          ? {
+              key: `order-email:${kind}`,
+              subject: `A customer's "${kind}" email did not send`,
+              body: `The "${kind}" email for order ${code} failed (send ${attempt} of ${EMAIL_ATTEMPTS}): ${reason}\n\nThe 5-minute job tries again. The order itself is unaffected.`,
+            }
+          : {
+              key: `order-email:${kind}:${order.id}`,
+              subject: `Order ${code}'s "${kind}" email was given up`,
+              body: `The "${kind}" email for order ${code} failed ${EMAIL_ATTEMPTS} times and will not be sent: ${reason}\n\nThe customer has not been emailed. Look the order up on /staff and call them if it matters.`,
+            },
+      );
     }
   } catch (error) {
     console.error('Order email check failed', error);

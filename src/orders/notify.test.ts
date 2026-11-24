@@ -12,7 +12,8 @@ const order = (status: OrderStatus, extra: Partial<EmailOrder> = {}): EmailOrder
   id: ID,
   status,
   pickupAt: '2026-11-27T06:15:00.000Z',
-  customer: {name: '<b>Aina</b> Rahman'},
+  paidAt: '2026-11-27T04:52:00.000Z',
+  customer: {name: '<b>Aina</b> Rahman', note: 'Write "Selamat Hari Jadi <Aisyah>" on the cake'},
   items: [
     {dishId: 'croissant', name: 'Croissant', unitSen: 900, quantity: 2},
     {dishId: 'latte', name: 'Latte / Cappuccino / Flat White', unitSen: 1250, quantity: 1},
@@ -33,9 +34,10 @@ function setup(current: EmailOrder & {email: string}, fail: (email: OrderEmail) 
     emails: {
       claim: async (orderId, kind) => {
         const row = rows.get(`${orderId}:${kind}`);
-        if (row && (row.state !== 'failed' || row.attempts >= EMAIL_ATTEMPTS)) return false;
-        rows.set(`${orderId}:${kind}`, {state: 'sending', attempts: (row?.attempts ?? 0) + 1});
-        return true;
+        if (row && (row.state !== 'failed' || row.attempts >= EMAIL_ATTEMPTS)) return null;
+        const attempts = (row?.attempts ?? 0) + 1;
+        rows.set(`${orderId}:${kind}`, {state: 'sending', attempts});
+        return attempts;
       },
       finish: async (orderId, kind, outcome) => {
         const row = rows.get(`${orderId}:${kind}`);
@@ -62,19 +64,19 @@ describe('notifyOrder', () => {
     await notifyOrder(ID, deps);
     expect(sent).toHaveLength(1);
     expect(sent[0].to).toBe('aina@example.com');
-    expect(sent[0].email.subject).toBe('Order K3F9QA · pick-up Fri 27 Nov, 2:15pm');
+    expect(sent[0].email.subject).toBe('Receipt for order K3F9QA · pick-up Fri 27 Nov, 2:15pm');
   });
 
   it('sends the ready note once the order is ready, and the receipt with it if that was missed', async () => {
     const {deps, sent} = setup(order('ready'));
     await notifyOrder(ID, deps);
-    expect(sent.map((s) => s.email.subject)).toEqual(['Order K3F9QA · pick-up Fri 27 Nov, 2:15pm', 'Order K3F9QA is ready to collect']);
+    expect(sent.map((s) => s.email.subject)).toEqual(['Receipt for order K3F9QA · pick-up Fri 27 Nov, 2:15pm', 'Order K3F9QA is ready to collect']);
   });
 
   it('sends no ready note to a customer already at the counter', async () => {
     const {deps, sent} = setup(order('ready', {arrivedAt: '2026-11-27T06:00:00.000Z'}));
     await notifyOrder(ID, deps);
-    expect(sent.map((s) => s.email.subject)).toEqual(['Order K3F9QA · pick-up Fri 27 Nov, 2:15pm']);
+    expect(sent.map((s) => s.email.subject)).toEqual(['Receipt for order K3F9QA · pick-up Fri 27 Nov, 2:15pm']);
   });
 
   it('sends nothing for an order not paid, or refunded', async () => {
@@ -92,7 +94,11 @@ describe('notifyOrder', () => {
     expect(rows.get(`${ID}:paid`)).toEqual({state: 'failed', attempts: EMAIL_ATTEMPTS});
     expect(alerts).toHaveLength(EMAIL_ATTEMPTS);
     expect(alerts[0].body).toContain('K3F9QA');
-    expect(alerts[0].body).not.toContain('aina@example.com');
+    expect(alerts.map((alert) => alert.body).join()).not.toContain('aina@example.com');
+    // Retries share one held-back alert; giving up is alerted for this order alone.
+    expect(alerts.slice(0, -1).every((alert) => alert.key === 'order-email:paid')).toBe(true);
+    expect(alerts.at(-1)?.key).toBe(`order-email:paid:${ID}`);
+    expect(alerts.at(-1)?.subject).toContain('given up');
   });
 
   it('never throws, even when the order cannot be read', async () => {
@@ -115,7 +121,14 @@ describe('orderEmail', () => {
   it('keeps the ready note to the code, the time and the way in', () => {
     expect(ready.text).not.toContain('Croissant');
     expect(ready.text).toContain('Order code: K3F9QA');
-    expect(ready.text).toContain('I’m here: https://cakejalantiung.app/order/');
+    expect(ready.text).toContain('Open your order: https://cakejalantiung.app/order/');
+    expect(ready.text).not.toContain('Selamat');
+  });
+
+  it('repeats the customer’s note and the paid time on the receipt', () => {
+    expect(receipt.text).toContain('Your note: Write "Selamat Hari Jadi <Aisyah>" on the cake');
+    expect(receipt.html).toContain('Selamat Hari Jadi &lt;Aisyah&gt;');
+    expect(receipt.text).toContain('Paid Fri 27 Nov, 12:52pm');
   });
 
   it('escapes what the customer typed, and keeps it out of the subject', () => {
