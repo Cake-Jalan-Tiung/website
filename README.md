@@ -19,7 +19,7 @@ Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or
 
 | For customers | For the shop |
 | --- | --- |
-| Menu built for a phone: a category rail, one-tap + on every photo, a sheet for each dish | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
+| Menu built for a phone: best sellers first, a category rail, one-tap + on every photo, a sheet for each dish, the next step always at the foot of the screen | Kitchen screen at `/staff` behind a PIN: new orders ring, one tap moves each along |
 | A bag pinned to the foot of the screen that survives closing the tab | Pause online ordering for today, or until resumed |
 | Open now and the soonest pick-up shown on the menu and the bag bar, before checkout | Mark dishes sold out until tomorrow |
 | Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered, one optional row of add-ons | A customer who taps I'm here goes to the top of the board, in pink, with a ring |
@@ -73,8 +73,9 @@ With `PAYMENTS=fake`, checkout opens a built-in test payment page and no money m
 | `pnpm test` | Unit tests: pricing, pick-up times, order statuses, payments, StoreHub sales, brand rules |
 | `pnpm typecheck` | Generates Worker types, then type-checks |
 | `pnpm fit` | Every page at six widths; fails on anything that overflows or a console error |
-| `pnpm walk` | Orders on a phone from home to paid against a running dev server, screenshot per screen; fails on a spill, a console error or a broken step |
+| `pnpm walk` | Orders on a phone from home to paid against a running dev server, screenshot per screen; fails on a spill, a console error or a broken step. `WALK_BROWSER=webkit` walks it in Safari's engine |
 | `pnpm spec` | Rendered components against the brand's Paper measurements |
+| `pnpm photos` | Writes each photo in `src/assets/photos` at the widths the site shows, as WebP; run after adding one |
 | `pnpm build` | Production build |
 | `pnpm deploy` | Deploy to Cloudflare |
 

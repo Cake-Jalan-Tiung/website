@@ -1,4 +1,5 @@
-// Loads the site, its menu, the specimen and the worst-case page at six widths and fails if
+// Loads the site, its menu, the specimen and the worst-case page at six widths (and the home
+// page's street at three laptop windows, where the hero must end at the fold) and fails if
 // anything spills: an element past the viewport edge, content wider than its box, or
 // content cut off by a box that clips.
 //
@@ -10,6 +11,9 @@ import {findSpills} from './spills.mjs';
 
 const PAGES = ['/', '/menu', '/checkout', '/staff', '/design-system', '/stress'];
 const WIDTHS = [320, 390, 768, 900, 1024, 1440];
+// Laptop windows wide enough for the home page's street, where the hero must be the first screen exactly.
+const STREET = [[1280, 720], [1440, 800], [1920, 1080]];
+const CASES = [...PAGES.flatMap((path) => WIDTHS.map((width) => ({path, width, height: 900}))), ...STREET.map(([width, height]) => ({path: '/', width, height, street: true}))];
 
 async function withServer(run) {
   if (process.env.FIT_URL) return run(process.env.FIT_URL);
@@ -28,17 +32,21 @@ async function withServer(run) {
 const failures = await withServer(async (base) => {
   const browser = await chromium.launch();
   const failed = [];
-  for (const path of PAGES) {
-    for (const width of WIDTHS) {
-      const page = await browser.newPage({viewport: {width, height: 900}});
+  for (const {path, width, height, street} of CASES) {
+    {
+      const page = await browser.newPage({viewport: {width, height}});
       const errors = [];
       page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
       page.on('pageerror', (error) => errors.push(String(error)));
       await page.goto(base + path, {waitUntil: 'networkidle'});
       await page.evaluate(() => document.fonts.ready);
       const problems = [...(await page.evaluate(findSpills)), ...new Set(errors.map((text) => `console: ${text}`))];
-      console.log(`${problems.length ? 'FAIL' : 'ok  '}  ${path} at ${width}${problems.length ? `\n        ${problems.slice(0, 8).join('\n        ')}${problems.length > 8 ? `\n        and ${problems.length - 8} more` : ''}` : ''}`);
-      if (problems.length) failed.push(`${path} at ${width}`);
+      if (street) {
+        const bottom = await page.evaluate(() => Math.round(document.querySelector('main > *').getBoundingClientRect().bottom));
+        if (bottom !== height) problems.push(`the hero ends at ${bottom}px, not at the fold (${height}px)`);
+      }
+      console.log(`${problems.length ? 'FAIL' : 'ok  '}  ${path} at ${width}${street ? `×${height}` : ''}${problems.length ? `\n        ${problems.slice(0, 8).join('\n        ')}${problems.length > 8 ? `\n        and ${problems.length - 8} more` : ''}` : ''}`);
+      if (problems.length) failed.push(`${path} at ${width}${street ? `×${height}` : ''}`);
       await page.close();
     }
   }
@@ -46,5 +54,5 @@ const failures = await withServer(async (base) => {
   return failed;
 });
 
-console.log(`\n${PAGES.length * WIDTHS.length - failures.length}/${PAGES.length * WIDTHS.length} pages fit`);
+console.log(`\n${CASES.length - failures.length}/${CASES.length} pages fit`);
 process.exit(failures.length ? 1 : 0);

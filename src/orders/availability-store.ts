@@ -1,5 +1,5 @@
-// What can be ordered, in the browser: read once the page is live and again when the tab comes
-// back into view. The server renders everything as available; checkout asks the server again,
+// What can be ordered, in the browser: read once the page is live, on every page reached in place,
+// and again when the tab comes back into view. The server renders everything as available; checkout asks the server again,
 // so a stale copy here can only show an Add button that checkout then explains.
 import {useSyncExternalStore} from 'react';
 import {OPEN, type Availability} from './availability';
@@ -33,5 +33,7 @@ const subscribe = (listener: () => void) => {
 };
 
 export const useAvailability = () => useSyncExternalStore(subscribe, snapshot, () => OPEN);
+/** Asks again, as each page reached in place would have when it loaded. */
+export const refreshAvailability = () => void (started ? refresh() : snapshot());
 /** Replaces the copy after staff change it on this device. */
 export const showAvailability = publish;

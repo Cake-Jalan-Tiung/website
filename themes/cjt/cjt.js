@@ -694,20 +694,25 @@ export const cjtTheme = {
         "borderStyle": "solid",
         "borderWidth": "1px",
         "borderColor": "var(--color-border)",
-        "boxShadow": "none"
+        "boxShadow": "none",
+        "@light": {
+          "--color-warning-muted": "#FFB08A"
+        }
       }
     },
     "text-input": {
       "base": {
         "@light": {
-          "--color-border-emphasized": "#111111"
+          "--color-border-emphasized": "#111111",
+          "--color-accent-muted": "#031CFE"
         }
       }
     },
     "text-area": {
       "base": {
         "@light": {
-          "--color-border-emphasized": "#111111"
+          "--color-border-emphasized": "#111111",
+          "--color-accent-muted": "#031CFE"
         }
       }
     }

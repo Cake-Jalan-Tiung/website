@@ -34,7 +34,7 @@
 /* The way to everything else: the whole cell, ink, the words at its foot. */
 .cell[data-more] { padding: 0; }
 .more { display: flex; flex: 1; color: inherit; text-decoration: none; }
-.more:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -4px; }
+.more:focus-visible { outline: 2px solid var(--cjt-color-cream-400); outline-offset: -4px; }
 .moreFace { display: flex; flex: 1; flex-direction: column; justify-content: flex-end; padding: var(--cjt-space-sm); }
 
 /* On a phone, two across: each drawing keeps room beside its +. */
@@ -45,7 +45,7 @@
 /* ---------- Motion, only where it is welcome; all of it ends within two seconds ---------- */
 @media (prefers-reduced-motion: no-preference) {
   /* The rules draw first, from the top left. */
-  .grid { animation: wipe 700ms cubic-bezier(0.65, 0, 0.35, 1) var(--enter-delay, 0ms) both; }
+  .grid { animation: wipe 700ms cubic-bezier(0.65, 0, 0.35, 1) var(--enter-delay, 0ms) backwards; }
 
   /* Then each dish rises into its cell, one after another. */
   .cell { --i: 0; animation: rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--enter-delay, 0ms) + 350ms + var(--i) * 90ms); }
@@ -69,7 +69,8 @@
 /* Under a pointer, a drawing lifts and tilts, and its pink marks breathe again. */
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
   .cell:hover .arrive > svg { transform: translateY(-6%) rotate(-4deg); }
-  .cell:hover :is(path, circle)[style*='mark-pink'] { animation: waft-again 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  /* The entrance stays listed beside the breath, so leaving the cell does not replay it. */
+  .cell:hover :is(path, circle)[style*='mark-pink'] { animation: waft 1100ms cubic-bezier(0.22, 1, 0.36, 1) both, waft-again 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 }
 
 @keyframes wipe {

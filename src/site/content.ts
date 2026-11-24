@@ -93,7 +93,7 @@ export const storefront: Storefront = {
     {title: 'Order ahead', line: 'Pay online, collect at the counter.'},
     {title: 'Open six days', line: '8am to 6pm. Closed on Thursdays.'},
     {title: 'Breakfast till noon', line: 'Served 8:30am to 12pm.'},
-    {title: 'Section 4, Shah Alam', line: '9, Jln Sukun 4/7.'},
+    {title: 'Seksyen 4, Shah Alam', line: '9, Jln Sukun 4/7.'},
   ],
   proof: {rating: 4.2, reviews: 704, source: 'Google', asOf: 'November 2026', href: googleListing},
   categories: [

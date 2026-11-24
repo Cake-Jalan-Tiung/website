@@ -36,7 +36,7 @@
 
 /* Add-ons: a short row of small photos with + on the corner, scrolled sideways if it runs out of room. */
 .addOns { display: flex; flex-direction: column; gap: var(--cjt-space-sm); padding-block: var(--cjt-space-sm); border-bottom: 1px solid var(--cjt-color-rule); }
-.addOnList { display: grid; grid-auto-columns: calc(var(--cjt-space-2xl) + var(--cjt-space-md)); grid-auto-flow: column; gap: var(--cjt-space-sm); margin: 0; padding: 0; overflow-x: auto; list-style: none; scrollbar-width: none; scroll-snap-type: x mandatory; }
+.addOnList { display: grid; overscroll-behavior-x: contain; grid-auto-columns: calc(var(--cjt-space-2xl) + var(--cjt-space-md)); grid-auto-flow: column; gap: var(--cjt-space-sm); margin: 0; padding: 0; overflow-x: auto; list-style: none; scrollbar-width: none; scroll-snap-type: x mandatory; }
 .addOnList::-webkit-scrollbar { display: none; }
 .addOn { display: flex; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); min-width: 0; scroll-snap-align: start; }
 .addOnMedia { position: relative; display: block; margin-bottom: var(--cjt-space-xs); }
@@ -127,14 +127,13 @@
   .checkout { gap: var(--cjt-space-md); padding: var(--cjt-space-lg) var(--cjt-space-sm) 0; }
   .layout { grid-template-columns: minmax(0, 1fr); gap: var(--cjt-space-lg); }
   .summary { position: static; }
-  /* On a phone Pay is fixed to the foot of the screen, edge to edge, and the form keeps room for it. */
-  .form { padding-bottom: calc(var(--store-cta-h, 56px) + var(--cjt-space-xl) + env(safe-area-inset-bottom)); }
-  /* Focus and scrolled-to fields stop above Pay, never under it. */
-  html:has(.payBar) { scroll-padding-bottom: calc(var(--store-cta-h, 56px) + var(--cjt-space-xl) + env(safe-area-inset-bottom)); }
+  /* On a phone Pay is fixed to the foot of the screen, edge to edge, and the form keeps room for it
+     as tall as it really is (an error above it, larger text), measured by src/storefront/foot.ts. */
+  .form { padding-bottom: calc(var(--foot-pay, calc(var(--store-cta-h, 56px) + var(--cjt-space-xl))) + var(--cjt-space-md)); }
   .payBar { position: fixed; inset: auto 0 0; padding-inline: var(--cjt-space-sm); }
   /* While a field is being typed in (the keyboard is up), Pay steps aside so it never covers the
      field; it comes back as soon as the field is left. Moving it instead would shift it under a tap. */
-  .form:has(:is(input:not([type=radio]), textarea, select):focus) .payBar { visibility: hidden; }
+  .form:has(:is(input:not([type=radio]), textarea):focus) .payBar { visibility: hidden; }
 }
 
 /* The order page: a field in the status's colour holding the code and where the order is, then the details. */

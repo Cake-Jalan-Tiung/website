@@ -3,17 +3,18 @@
 // With WALK_STAFF_PIN set it also signs in to /staff and moves the paid order to Ready.
 //
 //   WALK_URL=http://localhost:5179 node scripts/walk.mjs <out-dir>
+//   WALK_BROWSER=webkit ...   the same walk in Safari's engine (once: pnpm exec playwright-core install webkit)
 import {mkdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {chromium} from 'playwright-core';
+import {chromium, webkit} from 'playwright-core';
 import {findSpills} from './spills.mjs';
 
 const base = process.env.WALK_URL ?? 'http://localhost:5179';
 const out = process.argv[2] ?? join(tmpdir(), 'cjt-walk');
 mkdirSync(out, {recursive: true});
 
-const browser = await chromium.launch();
+const browser = await (process.env.WALK_BROWSER === 'webkit' ? webkit : chromium).launch();
 const phone = {viewport: {width: 390, height: 844}, deviceScaleFactor: 2, isMobile: true, hasTouch: true};
 const context = await browser.newContext(phone);
 const page = await context.newPage();
@@ -52,8 +53,19 @@ await screen('home-inside');
 await page.getByRole('button', {name: '← Back outside'}).click();
 await page.waitForTimeout(1500);
 expect(await page.getByRole('button', {name: /^Open the door/}).evaluate((el) => el === document.activeElement), 'coming back out returns focus to the door');
-await page.goto(`${base}/menu`, {waitUntil: 'networkidle'});
+// The foot of a phone's screen holds Order for pick-up once the hero's own button has scrolled
+// away, never both at once, and it opens the menu in place: the page is not loaded again.
+const footOrder = page.getByRole('complementary', {name: 'Order'});
+expect(!(await footOrder.isVisible()), 'the foot bar waits while the hero button is in sight');
+await page.evaluate(() => window.scrollTo(0, 1600));
+await page.waitForTimeout(600);
+expect(await footOrder.isVisible(), 'the foot bar offers Order for pick-up once the hero button is gone');
+await screen('home-foot-bar');
+await page.evaluate(() => (window.walkMark = 'home'));
+await footOrder.getByRole('link').click();
+await page.waitForURL(/\/menu$/);
 await page.waitForTimeout(400);
+expect(await page.evaluate(() => window.walkMark === 'home'), 'the menu opens in place, without loading the page again');
 expect(/^(Open|Closed) now · Pick-up /.test((await page.getByText(/ now · Pick-up /).first().textContent()) ?? ''), 'the menu says whether the shop is open and the soonest pick-up');
 await screen('menu');
 const pastries = page.getByRole('navigation', {name: 'Categories'}).getByRole('link', {name: 'Pastries'});
@@ -68,17 +80,19 @@ await add.nth(1).click();
 await page.getByRole('button', {name: 'Raspberry & Vanilla - Slice', exact: true}).click();
 await page.waitForTimeout(600);
 await screen('dish-sheet');
-await page.getByRole('button', {name: /^Add · /}).click();
+await page.getByRole('button', {name: /^Add RM /}).click();
 await page.waitForTimeout(600);
 // Taking a dish back out through the sheet: its count, down to nothing, Remove.
 await add.nth(2).click();
-await page.getByRole('button', {name: /^1 .* in bag, change$/}).nth(2).click();
+await page.getByRole('button', {name: /^Change .*, 1 in bag$/}).nth(2).click();
 await page.waitForTimeout(600);
 await page.getByRole('button', {name: /^One less /}).click();
 await page.getByRole('button', {name: 'Remove from bag'}).click();
 await page.waitForTimeout(600);
-expect((await page.getByRole('link', {name: /^\d+ View bag/}).textContent())?.includes('3'), 'the removed dish left the bag');
-expect((await page.getByRole('link', {name: /^\d+ View bag/}).textContent())?.includes('Pick-up '), 'the bag bar gives the soonest pick-up for the bag');
+expect((await page.getByRole('link', {name: /^View bag · /}).textContent())?.includes('View bag · 3 items'), 'the removed dish left the bag');
+expect((await page.getByRole('link', {name: /^View bag · /}).textContent())?.includes('Pick-up '), 'the bag bar gives the soonest pick-up for the bag');
+expect((await page.getByRole('button', {name: /^Change London to Shah Alam - Cake Slice, \d+ in bag$/}).count()) === 2, 'a best seller in the bag shows its count on the strip and on its row');
+expect(!(await page.getByRole('link', {name: /^Bag, /}).isVisible()), 'on a phone the bag is at the foot of the screen, not also in the header');
 await page.evaluate(() => window.scrollTo(0, 2400));
 await screen('menu-with-bag');
 
@@ -92,11 +106,16 @@ const pay = async () => {
   await settle();
 };
 
+await page.evaluate(() => (window.walkMark = 'menu'));
+await page.getByRole('link', {name: /^View bag · /}).click();
+await page.waitForURL(/\/checkout$/);
+expect(await page.evaluate(() => window.walkMark === 'menu'), 'View bag opens checkout in place');
+
 // First order: the payment is cancelled, and the customer is offered another try.
 await checkout();
 await screen('checkout');
 // The add-on row offers what the bag lacks; one tap moves a dish into the bag and out of the row.
-const addOns = page.getByRole('region', {name: 'Add to your order'});
+const addOns = page.getByRole('region', {name: 'Add to your bag'});
 const offered = addOns.getByRole('button', {name: /^Add .* to bag$/}).first();
 const offeredName = (await offered.getAttribute('aria-label'))?.replace(/^Add (.*) to bag$/, '$1');
 await offered.click();
@@ -140,11 +159,14 @@ await screen('order-paid', {full: true});
 const orderUrl = page.url();
 const orderCode = (await page.locator('p').filter({hasText: /^[0-9A-F]{6}$/}).first().textContent())?.trim();
 
-// Back on the home page, the order in the kitchen is one tap away.
+// Back on the home page, the order in the kitchen is one tap away, on a card that rises a beat after the page.
 await page.goto(`${base}/`, {waitUntil: 'networkidle'});
 await settle();
-expect((await page.getByRole('link', {name: new RegExp(`Order ${orderCode}.*Track`)}).count()) === 1, 'home leads back to the order in the kitchen');
-expect((await page.getByRole('link', {name: /^\d+ View bag/}).count()) === 0, 'the paid bag is empty');
+const lastOrder = page.getByRole('region', {name: 'Your last order'});
+expect(await lastOrder.waitFor({timeout: 5000}).then(() => true, () => false), 'the last order rises as a card');
+await screen('home-last-order');
+expect((await page.getByRole('link', {name: new RegExp(`^Track your order, ${orderCode}`)}).count()) === 1, 'home leads back to the order in the kitchen');
+expect((await page.getByRole('link', {name: /^View bag · /}).count()) === 0, 'the paid bag is empty');
 // A bag started now survives opening the order page again.
 await page.goto(`${base}/menu`, {waitUntil: 'networkidle'});
 await page.getByRole('button', {name: /^Add .* to bag$/}).first().click();
@@ -153,7 +175,7 @@ await settle();
 await page.waitForTimeout(4500);
 await page.goto(`${base}/`, {waitUntil: 'networkidle'});
 await settle();
-expect((await page.getByRole('link', {name: /^1 View bag/}).count()) === 1, 'revisiting a paid order leaves a new bag alone');
+expect((await page.getByRole('link', {name: /^View bag · 1 item /}).count()) === 1, 'revisiting a paid order leaves a new bag alone');
 await page.evaluate(() => localStorage.removeItem('cjt.bag.v1'));
 await page.reload({waitUntil: 'networkidle'});
 await settle();
@@ -222,6 +244,15 @@ if (process.env.WALK_STAFF_PIN) {
   expect(await page.waitForURL(/\/order\//, {timeout: 8000}).then(() => true, () => false), 'checkout sends a bag already paid for to its order');
   expect((await page.evaluate(() => localStorage.getItem('cjt.bag.v1'))) === '[]', 'the bag that was paid for is empty');
 }
+
+// The card never blocks the page: Close puts it away for the rest of the visit.
+await page.goto(`${base}/`, {waitUntil: 'networkidle'});
+await lastOrder.waitFor({timeout: 5000});
+await lastOrder.getByRole('button', {name: 'Close'}).click();
+await page.waitForTimeout(400);
+await page.reload({waitUntil: 'networkidle'});
+await page.waitForTimeout(1500);
+expect((await lastOrder.count()) === 0, 'a closed last-order card stays away for the visit');
 
 await browser.close();
 console.log(orderUrl);

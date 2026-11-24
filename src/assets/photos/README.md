@@ -2,7 +2,8 @@
 
 Drop a photo here named after what it shows and the site picks it up: `shio-pan.jpg`
 appears on the Shio Pan card and its menu row. JPG, PNG, WebP or AVIF; not HEIC.
-Any size works for now; they are resized before launch.
+Any size works. After adding or replacing one, run `pnpm photos`: it writes the widths the site
+shows (400 and 800px, WebP) into `sized/`. `pnpm test` fails until you do.
 
 - `hero` — the first screen
 - `shop` — beside the opening hours

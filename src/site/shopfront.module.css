@@ -65,6 +65,20 @@
 .frame { stroke: var(--cjt-color-gula); stroke-width: 10; }
 .frameThin { stroke: var(--cjt-color-ink); stroke-width: 3; }
 
+/* The street beside it, on a wide window: the neighbour's wall in the hero's own cream. */
+.wide { display: block; width: 100%; height: 100%; }
+.wash { fill: var(--cjt-color-cream-100); }
+.plinth { fill: var(--cjt-color-cream-400); }
+.pipe { fill: var(--cjt-color-chalk); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.pot { fill: var(--cjt-color-teh); stroke: var(--cjt-color-ink); stroke-width: 4; stroke-linejoin: round; }
+.plate { fill: var(--cjt-color-blue); stroke: var(--cjt-color-ink); stroke-width: 4; }
+.plateRule, .conduit { fill: none; }
+.plateRule { stroke: var(--cjt-color-cream-400); stroke-width: 2; }
+.conduit { stroke: var(--cjt-color-ink); stroke-width: 3; }
+.plateName, .plateArea { fill: var(--cjt-color-cream-400); font-family: inherit; font-weight: 500; text-anchor: middle; }
+.plateName { font-size: 28px; letter-spacing: 0.08em; }
+.plateArea { font-size: 16px; letter-spacing: 0.3em; }
+
 /* Type in the drawing: the sign in the brand's caps, the decal in paper, the board in chalk. */
 .sign { fill: var(--cjt-color-blue); font-family: inherit; font-size: 52px; font-weight: 500; letter-spacing: 0.1em; }
 .number { fill: var(--cjt-color-ink); font-family: inherit; font-size: 26px; font-weight: 500; }
@@ -85,7 +99,8 @@
   transform-origin: 0 50%;
 }
 .door > svg { display: block; width: 100%; height: 100%; }
-.door:focus-visible { outline: 3px solid var(--cjt-color-blue); outline-offset: 3px; }
+/* The ring sits on the door's own wood, clear of the ink lines around it. */
+.door:focus-visible { outline: 3px solid var(--cjt-color-blue); outline-offset: -6px; }
 .outside { perspective: 900px; transform-origin: 57% 66.8%; }
 
 /* Inside: the counter, centred, and the way back out. */
@@ -110,6 +125,20 @@
 .hint { display: block; }
 .hint[data-hidden] { visibility: hidden; }
 
+/* On a wide window the shop stands in the street (see .heroBand in storefront.module.css): no
+   frame, the tree's leaves free to reach over the neighbour's wall, and the hint on the road
+   under the door. The street is clipped only while it falls away going in, and until it is back. */
+@media (min-width: 77.5em) and (min-aspect-ratio: 5/3) {
+  .shopfront { position: relative; height: 100%; }
+  .scene { border: 0; overflow: visible; transition: overflow 0s linear 750ms; transition-behavior: allow-discrete; }
+  .scene[data-inside] { overflow: hidden; transition-delay: 0s; }
+  .street { overflow: visible; }
+  .hint { position: absolute; bottom: 3%; left: 50%; }
+}
+@media (min-width: 77.5em) and (min-aspect-ratio: 5/3) and (prefers-reduced-motion: reduce) {
+  .scene { transition: none; }
+}
+
 /* ---------- Motion ---------- */
 @media (prefers-reduced-motion: no-preference) {
   /* Going in: the door swings open (0–600ms), the street falls away past it (350–1100ms),
@@ -123,7 +152,7 @@
 
   /* Before anyone has knocked: the door gives a small nudge once, to say it opens. */
   .door { animation: nudge 1200ms cubic-bezier(0.34, 1.56, 0.64, 1) 1800ms 2; }
-  .scene[data-inside] .door { animation: none; }
+  .scene:is([data-inside], [data-knocked]) .door { animation: none; }
 }
 @media (prefers-reduced-motion: no-preference) and (hover: hover) {
   .scene:not([data-inside]) .door:hover { transform: rotateY(-22deg); transition-delay: 0ms; transition-duration: 350ms; }

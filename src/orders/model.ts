@@ -47,7 +47,7 @@ export function priceCart(store: Storefront, cart: readonly CartLine[], {allowTe
   const seen = new Set<string>();
   const lines = cart.map(({dishId, quantity}) => {
     const dish = orderableDish(store, dishId);
-    if (!dish) throw new CartError('Something in the bag is no longer on the menu.');
+    if (!dish) throw new CartError('Something in your bag is no longer on the menu. Reload this page to update your bag.');
     if (seen.has(dishId)) throw new CartError('A dish appears twice in the bag.');
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) throw new CartError(`Quantities run from 1 to ${MAX_QUANTITY}.`);
     seen.add(dishId);

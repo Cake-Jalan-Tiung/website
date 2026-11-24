@@ -8,6 +8,7 @@ import {Type} from '../system/Type';
 import {AddToBag, formatPrice} from './bag';
 import type {Action, Dish} from './model';
 import {OpenDish, openDish} from './sheet';
+import {StoreLink} from './link';
 import c from './counter.module.css';
 
 export function Counter({dishes, more}: {dishes: readonly Dish[]; more?: Action}) {
@@ -36,11 +37,11 @@ export function Counter({dishes, more}: {dishes: readonly Dish[]; more?: Action}
       })}
       {more ? (
         <li className={c.cell} data-more="">
-          <a href={more.href} className={c.more}>
+          <StoreLink href={more.href} className={c.more}>
             <Field as="span" colour="ink" outlined={false} className={c.moreFace}>
               <Type role="subhead">Full menu →</Type>
             </Field>
-          </a>
+          </StoreLink>
         </li>
       ) : null}
     </ul>

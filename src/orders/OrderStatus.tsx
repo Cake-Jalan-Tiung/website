@@ -2,6 +2,7 @@
 // the page allows, the steps behind it, then when and where to collect and what is in it. It
 // follows the order by itself until it is finished.
 import {useEffect, useRef, useState} from 'react';
+import {useRouter} from '@tanstack/react-router';
 import {Link} from '@astryxdesign/core/Link';
 import {storefront} from '../site/content';
 import {Cta} from '../storefront/bag';
@@ -41,6 +42,7 @@ const GROUND: Record<OrderStatus, Exclude<Ground, 'paper'>> = {
 };
 
 export function OrderStatusPage({initial}: {initial: PublicOrder}) {
+  const router = useRouter();
   const [order, setOrder] = useState(initial);
   const finished = isFinished(order.status);
 
@@ -111,7 +113,7 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
             <Cta
               onClick={() => {
                 bag.include(again);
-                window.location.assign('/checkout');
+                void router.navigate({href: '/checkout'});
               }}
             >
               Order the same again

@@ -17,7 +17,7 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 
 
 /* The header: sticky, one row, a hairline under it. */
-.header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--cjt-color-rule); }
+.header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--cjt-color-rule); view-transition-name: store-header; }
 .headerInner {
   display: flex;
   align-items: center;
@@ -32,6 +32,8 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 .brand:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 4px; }
 .nav {
   display: flex;
+  padding: var(--cjt-space-xs);
+  margin: calc(-1 * var(--cjt-space-xs));
   flex: 1 1 auto;
   justify-content: safe center;
   gap: var(--cjt-space-md);
@@ -41,8 +43,71 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   white-space: nowrap;
 }
 
+/* The hero's band, on the sheet's gutters as every band is. */
+.heroBand { position: relative; padding-block: var(--cjt-space-xl); }
+.heroStreet { display: none; }
+/* The hero: the words beside the picture; on a phone the picture first, then the words a step closer
+   together, so the line, its button and whether the shop is open all reach the first screen. */
+.hero {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--cjt-space-xl);
+  box-sizing: border-box;
+  max-width: var(--cjt-container-sheet);
+  margin-inline: auto;
+  padding-inline: var(--cjt-space-gutter);
+}
+@media (max-width: 1199px) { .hero { padding-inline: var(--cjt-space-lg); } }
+@media (max-width: 899px) {
+  .heroBand { padding-block: var(--cjt-space-lg); }
+  .hero { padding-inline: var(--cjt-space-sm); }
+}
+.heroText { display: flex; flex-direction: column; gap: var(--cjt-space-lg); min-width: 0; }
+@media (max-width: 899px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: var(--cjt-space-md); }
+  .heroText { gap: var(--cjt-space-md); }
+}
+/* On a wide window the hero is the first screen, whole: the band takes the height under the header
+   and centres both columns in it, and the picture is sized by whichever runs out first, its
+   column's width or the screen's height (the drawing is 1000 by 1100, plus its line underneath),
+   so its foot never falls past the fold. A very short window keeps a 320px floor and scrolls. */
+@media (min-width: 900px) {
+  .hero {
+    --hero-h: max(calc(100svh - var(--store-header-h) - 1px - 2 * var(--cjt-space-xl)), calc(5 * var(--cjt-space-xl)));
+    min-height: var(--hero-h);
+  }
+  .heroArt { justify-self: end; width: min(100%, calc((var(--hero-h) - var(--cjt-space-xs) - var(--cjt-leading-body) - 2px) * 10 / 11)); }
+}
+/* A wide, landscape window is the street itself. The band runs edge to edge and takes the screen
+   under the header; the shop stands at full height against the right edge, and the street (the
+   neighbour's wall, in the band's own cream) fills the rest behind the words, which start on the
+   header's gutter as if painted on that wall. 77.5em (1240px at the browser's usual 16px text) and 5:3 keep at least 640px of wall beside
+   the shop for them; anything narrower or squarer keeps the words beside the picture. */
+@media (min-width: 77.5em) and (min-aspect-ratio: 5/3) {
+  .heroBand[data-street] {
+    --street-h: max(calc(100svh - var(--store-header-h) - 1px), calc(9 * var(--cjt-space-xl)));
+    --shop-w: calc(var(--street-h) * 10 / 11);
+    padding-block: 0;
+    overflow: hidden;
+  }
+  .heroBand[data-street] .heroStreet { position: absolute; inset: 0 var(--shop-w) 0 0; display: block; }
+  .heroBand[data-street] .hero {
+    position: relative;
+    z-index: 1;
+    grid-template-columns: minmax(0, 1fr) var(--shop-w);
+    gap: 0;
+    height: var(--street-h);
+    min-height: 0;
+    max-width: none;
+    padding-inline: max(var(--cjt-space-gutter), calc((100% - var(--cjt-container-sheet)) / 2 + var(--cjt-space-gutter))) 0;
+  }
+  /* The words centre on the wall above its painted plinth (806 of the street's 1100), not on the whole height. */
+  .heroBand[data-street] .heroText { padding-block-end: calc(var(--street-h) * 294 / 1100); padding-inline-end: var(--cjt-space-xl); }
+  .heroBand[data-street] .heroArt { align-self: stretch; width: var(--shop-w); }
+}
 /* The hero's line, held to a readable measure. */
-.headline { max-width: 12ch; }
+.headline { max-width: 12ch; white-space: pre-line; }
 .heroActions { display: flex; flex-direction: column; align-items: flex-start; gap: var(--cjt-space-sm); max-width: var(--cjt-container-tile); }
 .heroActions > .cta { width: 100%; }
 .heroMedia { display: block; }
@@ -66,6 +131,40 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   margin-inline: auto;
   padding: var(--cjt-space-xl) var(--cjt-space-gutter);
 }
+.section { display: flex; flex-direction: column; gap: var(--cjt-space-lg); }
+
+/* A long list on a phone (the menu): sections a step closer, each heading at the menu board's own
+   size (24, medium, tight, as on Mock up 03) straight over its rows; the rail already says where you are. */
+@media (max-width: 899px) {
+  .sections[data-dense] { gap: var(--cjt-space-lg); padding-top: var(--cjt-space-md); }
+  .sections[data-dense] .section { gap: var(--cjt-space-xs); }
+  .sections[data-dense] .sectionTitle { font-size: var(--cjt-text-subhead); line-height: var(--cjt-leading-subhead); }
+  /* The gutter moves into each section, so a strip can run to the screen's edges without spilling. */
+  .sections[data-dense] { padding-inline: 0; }
+  .sections[data-dense] .section > * { margin-inline: var(--cjt-space-sm); }
+  .sections[data-dense] .section > .strip { margin-inline: 0; padding-inline: var(--cjt-space-sm); scroll-padding-inline: var(--cjt-space-sm); }
+}
+
+/* The best sellers as a row: four across on a wide screen; on a phone a row the thumb swipes, edge
+   to edge, each card snapping to the gutter and the next one cut by the screen's edge. */
+.strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--cjt-space-lg); margin: 0; padding: 0; list-style: none; }
+.stripItem { min-width: 0; }
+@media (max-width: 899px) {
+  .strip {
+    grid-template-columns: none;
+    grid-auto-columns: min(40%, calc(var(--cjt-space-3xl) + var(--cjt-space-2xl)));
+    grid-auto-flow: column;
+    gap: var(--cjt-space-sm);
+    /* Room above and below for a card's focus ring, which the scrolling box would otherwise cut. */
+    padding-block: var(--cjt-space-xs);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  .stripItem { scroll-snap-align: start; }
+}
 
 /* Facts: four in a row, a hairline over each. */
 .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--cjt-space-md); margin: 0; padding: 0; list-style: none; }
@@ -75,6 +174,21 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 /* Media: a box of fixed proportions. A photo fills it, cropped; a stage fills it too, its
    drawing held to the box's real height (100cqh) instead of the stage's drawn height. */
 .media { display: block; container-type: size; width: 100%; overflow: hidden; }
+/* A photo answers the finger at once: it sinks a little while its dish or category is pressed. */
+@media (prefers-reduced-motion: no-preference) {
+  .media { transition: scale 160ms cubic-bezier(0.2, 0, 0, 1); }
+  .card:has(.open:active) .media,
+  .menuRow:has(.open:active) .media,
+  .tileLink:active .media { scale: 0.97; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card:has(.open:active) .media,
+  .menuRow:has(.open:active) .media,
+  .tileLink:active .media,
+  .add:not(:disabled):active .addFace,
+  .cta:not(:disabled):active .ticket,
+  .bagBarLink:active .bagBarBody { opacity: 0.8; }
+}
 .media > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .media > [class] { --h: 100cqh; height: 100%; min-height: 0; box-sizing: border-box; }
 .dishName { font-weight: var(--cjt-weight-medium); }
@@ -96,11 +210,22 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 
 /* The photo's corner: + in one tap, the count once it is in the bag. It sits over the stretched name. */
 .corner { position: absolute; right: 0; bottom: 0; z-index: 1; }
-.add { display: block; padding: 0; border: 0; background: none; cursor: pointer; touch-action: manipulation; }
-.addFace { display: grid; place-items: center; width: var(--store-tap); height: var(--store-tap); }
+/* + is a 32px square set 8px in from the photo's corner; the button's padding is that 8px, so the
+   finger still gets 48px. In the bag it turns cream with an ink hairline: chosen, not shouting. */
+.add { display: block; padding: var(--cjt-space-xs); border: 0; background: none; cursor: pointer; touch-action: manipulation; }
+.addFace { display: grid; place-items: center; width: calc(var(--store-tap) - 2 * var(--cjt-space-xs)); height: calc(var(--store-tap) - 2 * var(--cjt-space-xs)); }
+.addCounted { outline: 1px solid var(--cjt-color-ink); outline-offset: -1px; }
 .addCount { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
+/* The count lands on the corner with a small spring where the finger was. */
+@media (prefers-reduced-motion: no-preference) {
+  .addCounted { animation: counted 360ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+}
+@keyframes counted {
+  from { scale: 0.6; }
+}
 .add:disabled { cursor: not-allowed; opacity: 0.4; }
-.add:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
+/* Focused, the whole 48px square turns paper under an ink ring, so the ring reads on any photo. */
+.add:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: -2px; background: var(--cjt-color-paper); }
 .soldOut { display: block; padding: var(--cjt-space-xs); }
 
 /* A whole tile that is one link: no underline on the block, a clear focus ring, the name underlines under the pointer. */
@@ -129,6 +254,14 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   white-space: nowrap;
 }
 .railScroll::-webkit-scrollbar { display: none; }
+/* More categories past the edge: a paper square with an arrow at the rail's end, over a hairline;
+   the rail keeps the square's width free at its end so the last category clears it. */
+.railMore { position: absolute; top: 0; right: 0; bottom: 1px; display: grid; place-items: center; width: var(--store-tap); padding: 0; border: 0; border-inline-start: 1px solid var(--cjt-color-ink); background: var(--cjt-color-paper); cursor: pointer; touch-action: manipulation; }
+.railScroll::after { content: ''; flex: 0 0 var(--store-tap); }
+/* The square is for the pointer; while the keyboard is in the rail, it steps aside from the links. */
+.rail:focus-within .railMore { display: none; }
+/* A sideways swipe at the rail's end stays in the rail instead of becoming the browser's back. */
+.railScroll { overscroll-behavior-x: contain; }
 .railLink {
   display: flex;
   flex-shrink: 0;
@@ -140,11 +273,10 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 }
 .railLink[aria-current] { border-bottom-color: var(--cjt-color-ink); }
 .railLink[aria-current] * { font-weight: var(--cjt-weight-medium); }
-.railLink:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -2px; }
+.railLink:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: calc(-1 * var(--store-heavy) - 2px); }
 
 /* The menu: hairline rows, name, description and price beside the photo. Two columns on a wide screen. */
 .menuList {
-  margin-block-start: calc(-1 * var(--cjt-space-md));
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--cjt-space-xl);
@@ -171,7 +303,7 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 .weekRow[data-today] * { font-weight: var(--cjt-weight-medium); }
 
 /* A plain link on ink: the text keeps its legal ink, the underline comes on hover and focus. */
-.plainLink { color: inherit; text-decoration: none; }
+.plainLink { color: var(--cjt-color-cream-400); text-decoration: none; }
 .plainLink:focus-visible { text-decoration: underline; text-underline-offset: 0.2em; }
 @media (hover: hover) {
   .plainLink:hover { text-decoration: underline; text-underline-offset: 0.2em; }
@@ -192,20 +324,28 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   .menuList { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* On a phone the header keeps the bird, the menu and Order now. */
-@media (max-width: 599px) {
+/* On a phone the header keeps the bird and the menu. Order now and the bag move to the foot of the
+   screen, where the thumb is (BagBar), so the two are never on screen at once. */
+.headerAction { display: flex; flex-shrink: 0; }
+.headerAction > .cta { width: auto; }
+@media (max-width: 37.49em) {
   .nav > :not(:first-child) { display: none; }
   .nav { justify-content: flex-end; }
+  .headerAction { display: none; }
 }
-@media (max-width: 399px) {
+/* Between a phone and a wide screen the bag's ticket needs the room: the bird alone stands for the
+   shop, and the links sit a step closer, so all three stay whole. */
+@media (max-width: 899px) {
   .brandName { display: none; }
+  .nav { gap: var(--cjt-space-sm); }
 }
-.headerInner > a:last-child { flex-shrink: 0; }
 @media (max-width: 299px) {
   .nav { display: none; }
-  .headerInner > a:last-child { margin-inline-start: auto; }
   .menuRow { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Controls stay controls under a long press: no text selection, no link preview. */
+.add, .cta, .stepperButton, .railLink, .bagBarLink, .open { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* − n +: one hairline frame around three 48px cells, a cell inverted while pressed. */
 .stepper { display: inline-flex; flex-shrink: 0; align-items: center; border: 1px solid var(--cjt-color-ink); }
@@ -225,80 +365,96 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   touch-action: manipulation;
 }
 .stepperButton:active:not(:disabled) { background: var(--cjt-color-ink); color: var(--cjt-color-paper); }
-.stepperButton:disabled { cursor: not-allowed; opacity: 0.3; }
+.stepperButton[aria-disabled='true'] { cursor: not-allowed; opacity: 0.3; }
 .stepperButton:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -2px; }
 .stepperCount { min-width: var(--cjt-space-md); text-align: center; font-variant-numeric: tabular-nums; }
 
 /* The one big action on a screen: a cobalt field, cream words, full width. */
+/* The one big action, as a counter ticket: a cream field with what it does on the left and the
+   amount on the right, then a 48px cobalt square with the arrow. 48px tall, the words regular, the
+   figures medium with RM in small capitals. */
 .cta { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; text-decoration: none; cursor: pointer; touch-action: manipulation; }
-.ctaFace { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: var(--store-cta-h); padding: var(--cjt-space-xs) var(--cjt-space-md); overflow: hidden; }
-/* The words wrap rather than clip: the total on the button is what the customer is confirming. */
-.ctaText { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; text-align: center; }
-/* Pressing a cobalt action (+, the big action, the bag bar) sinks it a little; never while disabled. */
+.ticket { display: flex; min-height: var(--store-tap); }
+.ticketBody { position: relative; display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--cjt-space-sm); min-width: 0; padding: var(--cjt-space-xs) var(--cjt-space-sm); overflow: hidden; }
+.ticketLabel { text-align: start; }
+.ticketGo { display: grid; flex-shrink: 0; place-items: center; min-width: var(--store-tap); }
+.amount { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The header's ticket: 40px, the same parts closer together. */
+.cta[data-compact] .ticket { min-height: var(--cjt-space-lg); }
+.cta[data-compact] .ticketBody { flex-wrap: nowrap; padding-block: 0; white-space: nowrap; }
+.cta[data-compact] .ticketGo { min-width: var(--cjt-space-lg); }
+.recount { display: inline-block; }
 @media (prefers-reduced-motion: no-preference) {
-  .addFace, .ctaFace, .bagBarLink { transition: scale 150ms ease-out; }
+  .recount { animation: counted 360ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+}
+.glyph { display: inline-block; translate: 0 -0.08em; }
+/* Read by a screen reader, not shown. */
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.currency { font-size: var(--cjt-text-label); letter-spacing: var(--cjt-tracking-caps); vertical-align: 0.15em; }
+/* Pressing an action sinks it a little; never while disabled. */
+@media (prefers-reduced-motion: no-preference) {
+  .addFace, .ticket, .bagBarLink { transition: scale 150ms ease-out; }
   .add:not(:disabled):active .addFace,
-  .cta:not(:disabled):active .ctaFace,
+  .cta:not(:disabled):not([aria-disabled]):active .ticket,
   .bagBarLink:active { scale: 0.96; }
 }
 .cta:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
 .cta:disabled:not([data-busy]) { cursor: not-allowed; }
-.cta:disabled:not([data-busy]) .ctaFace { opacity: 0.4; }
-/* While busy, a cream bar runs along the foot of the button. */
+.cta:disabled:not([data-busy]) .ticket { opacity: 0.4; }
+/* While busy, a cobalt line along the foot of the ticket; the words ("Opening payment…") say the rest. */
 .cta[data-busy] { cursor: progress; }
-.cta[data-busy] .ctaFace::after {
+.cta[data-busy] .ticketBody::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
   height: var(--store-heavy);
-  background: var(--cjt-color-cream-400);
-  transform-origin: left;
-  animation: busy 1.2s ease-in-out infinite;
-}
-.cta[data-busy] .ctaFace[data-colour='cream-400']::after { background: var(--cjt-color-blue); }
-@keyframes busy {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cta[data-busy] .ctaFace::after { animation: none; }
+  background: var(--cjt-color-blue);
 }
 
 /* The bag bar: one cobalt bar pinned to the foot of the screen until the footer, count, View bag, total. */
-.bagBar { position: sticky; bottom: 0; z-index: 2; }
-.bagBarField { padding-bottom: env(safe-area-inset-bottom); }
-.bagBarLink {
+.bagBar { position: sticky; bottom: 0; z-index: 2; view-transition-name: store-bar; }
+/* It rises into place when it first appears, and the idle bar slides out of the way while the page's own button is in sight. */
+.bagBar[data-hidden] { translate: 0 100%; visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .bagBar { transition: translate 280ms cubic-bezier(0.2, 0, 0, 1), visibility 0s; }
+  .bagBar[data-rise] { animation: rise-in 280ms cubic-bezier(0.2, 0, 0, 1); }
+  .bagBar[data-hidden] { transition: translate 200ms cubic-bezier(0.4, 0, 1, 1), visibility 0s 200ms; }
+}
+@keyframes rise-in {
+  from { translate: 0 100%; }
+}
+/* Phones only: from 600px up the header holds the bag (BagButton), so it is never shown twice. */
+@media (min-width: 37.5em) { .bagBar { display: none; } }
+/* The bar is the same ticket at the foot of the screen, torn along a dashed ink edge: what is in
+   the bag in small capitals, the soonest pick-up under it, the total, the cobalt square to go. */
+.bagBarField { padding-bottom: env(safe-area-inset-bottom); border-top: 1px dashed var(--cjt-color-ink); }
+.bagBarLink { display: flex; min-height: var(--store-cta-h); color: inherit; text-decoration: none; touch-action: manipulation; }
+.bagBarLink:focus-visible { outline: none; }
+.bagBarLink:focus-visible .bagBarBody { outline: 2px solid var(--cjt-color-ink); outline-offset: -4px; }
+.bagBarBody {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--cjt-space-sm);
+  justify-content: space-between;
+  gap: 0 var(--cjt-space-sm);
   box-sizing: border-box;
-  max-width: var(--cjt-container-sheet);
-  min-height: var(--store-cta-h);
-  margin-inline: auto;
-  padding-inline: var(--cjt-space-gutter);
-  color: inherit;
-  text-decoration: none;
-  touch-action: manipulation;
+  min-width: 0;
+  padding: var(--cjt-space-xs) var(--cjt-space-md) var(--cjt-space-xs) var(--cjt-space-gutter);
 }
-.bagBarLink:focus-visible { outline: 2px solid var(--cjt-color-cream-400); outline-offset: -4px; }
-.bagCount { display: grid; place-items: center; min-width: var(--cjt-space-lg); height: calc(var(--cjt-space-md) + var(--cjt-space-xs)); border: 1px solid var(--cjt-color-cream-400); font-variant-numeric: tabular-nums; }
-.bagBarLabel { display: flex; flex: 1 0 auto; flex-direction: column; min-width: 0; }
-.bagBarTitle { font-weight: var(--cjt-weight-medium); }
-/* A change in the count lands with a small pop, so an add made far from the bar is still seen. */
+.bagBarLabel { display: flex; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); min-width: 0; }
+/* A change in the count lands softly where the eye is, so an add made far from the bar is still seen. */
 @media (prefers-reduced-motion: no-preference) {
-  .bagCount { animation: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .bagBarTitle { animation: arrive 240ms ease-out; }
 }
-@keyframes pop {
-  from { scale: 1.35; background: var(--cjt-color-cream-400); color: var(--cjt-color-blue); }
-}
-.bagBarTotal { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
-@media (max-width: 1199px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-lg); } }
-@media (max-width: 899px) { .bagBarLink, .railScroll { padding-inline: var(--cjt-space-sm); } }
+@media (max-width: 1199px) { .bagBarBody { padding-left: var(--cjt-space-lg); } .railScroll { padding-inline: var(--cjt-space-lg); } }
+@media (max-width: 899px) { .bagBarBody { padding-left: var(--cjt-space-sm); } .railScroll { padding-inline: var(--cjt-space-sm); } }
 
 /* The dish sheet: the photo edge to edge, the words, then the quantity and the action held at its foot. */
 .sheet { display: flex; flex-direction: column; }
 .sheetPhoto { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: 45svh; object-fit: cover; }
+.sheetBody > p { max-width: var(--cjt-measure); }
+@media (max-height: 30em) and (orientation: landscape) { .sheetPhoto { display: none; } }
 .sheetBody { display: flex; flex-direction: column; gap: var(--cjt-space-xs); padding: var(--cjt-space-md) var(--cjt-space-sm) var(--cjt-space-md); }
 .sheetName { font-weight: var(--cjt-weight-medium); }
 .sheetPrice { font-weight: var(--cjt-weight-medium); font-variant-numeric: tabular-nums; }
@@ -316,7 +472,7 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 }
 .sheetFoot > .cta { flex: 1 1 calc(var(--cjt-space-2xl) + var(--cjt-space-lg)); min-width: 0; }
 .sheetNote { flex: 1 1 100%; }
-.sheetFoot .ctaFace { min-height: var(--store-tap); padding-inline: var(--cjt-space-xs); }
+
 
 /* Focus mode's way back to the menu. */
 .back { display: flex; align-items: center; min-height: var(--store-tap); margin-inline-start: auto; text-decoration: none; }
@@ -341,33 +497,66 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   from { opacity: 0; }
 }
 
-/* The last order under the header: what it is on the left, the one action on the right. */
-.again { border-bottom: 1px solid var(--cjt-color-rule); }
-.againInner {
+/* The last order: a card that rises from the foot of the screen, never over the page's middle.
+   Paper in an ink hairline, the dishes' photos stacked like plates, and the ticket as its stub,
+   torn off along a dashed edge. On a phone it spans the screen above the foot bar; wider, it sits
+   in the corner. */
+.lastCard {
+  position: fixed;
+  right: var(--cjt-space-sm);
+  bottom: calc(var(--cjt-space-sm) + env(safe-area-inset-bottom));
+  left: var(--cjt-space-sm);
+  z-index: 3;
   display: flex;
-  align-items: center;
-  gap: var(--cjt-space-md);
-  box-sizing: border-box;
-  max-width: var(--cjt-container-sheet);
-  margin-inline: auto;
-  padding: var(--cjt-space-sm) var(--cjt-space-gutter);
+  flex-direction: column;
+  max-height: calc(100svh - var(--store-header-h) - var(--foot-bar, 0px) - 2 * var(--cjt-space-md));
+  border: 1px solid var(--cjt-color-ink);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
-.againText { display: flex; flex: 1 1 auto; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); min-width: 0; }
-.againTitle { font-weight: var(--cjt-weight-medium); }
-.againSummary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
-.againTrack { display: flex; flex: 1 1 auto; align-items: center; gap: var(--cjt-space-md); min-height: var(--store-tap); color: inherit; text-decoration: none; touch-action: manipulation; }
-.againTrack:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 2px; }
-.againButton { flex-shrink: 0; padding: 0; border: 0; background: none; font: inherit; cursor: pointer; touch-action: manipulation; }
-.againFace { display: flex; align-items: center; min-height: var(--store-tap); padding-inline: var(--cjt-space-sm); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.againButton:focus-visible { outline: 2px solid var(--cjt-color-ink); outline-offset: 2px; }
+.lastCardHead { display: flex; align-items: center; justify-content: space-between; padding-inline-start: var(--cjt-space-sm); }
+.lastCardClose { display: grid; place-items: center; width: var(--store-tap); height: var(--store-tap); padding: 0; border: 0; background: none; color: var(--cjt-color-ink); cursor: pointer; touch-action: manipulation; }
+.lastCardClose:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: -4px; }
+.lastCardBody { display: flex; flex: 1 1 auto; align-items: center; gap: var(--cjt-space-sm); min-height: 0; padding: 0 var(--cjt-space-sm) var(--cjt-space-sm); overflow-y: auto; touch-action: pan-y; }
+/* At the page's end the footer keeps clear of the card, so its last links are never under it. */
+html:has(.lastCard) footer { padding-block-end: calc(var(--foot-card, 0px) + var(--foot-bar, 0px) + var(--cjt-space-xl)); }
+.lastCardText { display: flex; flex: 1 1 auto; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); min-width: 0; }
+.lastCardTitle { font-weight: var(--cjt-weight-medium); }
+/* The order page's steps, small: a bar per step, ink once reached. */
+.lastCardSteps { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: calc(var(--cjt-space-xs) / 2); margin-top: calc(var(--cjt-space-xs) / 2); }
+.lastCardSteps > span { height: 2px; background: var(--cjt-color-rule); }
+.lastCardSteps > span[data-done] { background: var(--cjt-color-ink); }
+.lastCard > .cta { border-top: 1px dashed var(--cjt-color-ink); }
+.plates { display: flex; flex-shrink: 0; }
+.plate { display: block; width: var(--cjt-space-lg); height: var(--cjt-space-lg); object-fit: cover; outline: 2px solid var(--cjt-color-paper); background: var(--cjt-color-cream-400); }
+.plate + .plate { margin-inline-start: calc(-1 * var(--cjt-space-sm)); }
+.plate:nth-child(1) { z-index: 3; }
+.plate:nth-child(2) { z-index: 2; }
+.plate:nth-child(3) { z-index: 1; }
+/* On a phone one thing holds the foot at a time: while the card is up it stands in for the idle
+   Order for pick-up, and it rises above the bag bar, which keeps the bag's total in sight. */
+html:has(.lastCard) .bagBar[data-idle] { translate: 0 100%; visibility: hidden; }
+@media (max-width: 37.49em) {
+  html:has(.bagBar:not([data-idle])) .lastCard { bottom: calc(var(--store-cta-h) + var(--cjt-space-sm) + env(safe-area-inset-bottom)); }
+}
+@media (min-width: 37.5em) {
+  .lastCard { left: auto; width: calc(4 * var(--cjt-space-2xl)); right: var(--cjt-space-md); bottom: var(--cjt-space-md); }
+}
 @media (prefers-reduced-motion: no-preference) {
-  .againFace { transition: scale 150ms ease-out; }
-  .againButton:active .againFace { scale: 0.96; }
+  .lastCard { transition: bottom 280ms cubic-bezier(0.2, 0, 0, 1), translate 240ms cubic-bezier(0.2, 0, 0, 1); }
+  .lastCard[data-pulled] { transition: bottom 280ms cubic-bezier(0.2, 0, 0, 1); }
+  /* It rises with a little overshoot, then its plates land one after another. */
+  .lastCard[data-presence='rising'] { animation: card-in 560ms cubic-bezier(0.16, 1.2, 0.3, 1) backwards; }
+  .lastCard[data-presence='rising'] .plate { animation: plate-in 480ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+  .lastCard[data-presence='rising'] .plate:nth-child(1) { animation-delay: 180ms; }
+  .lastCard[data-presence='rising'] .plate:nth-child(2) { animation-delay: 240ms; }
+  .lastCard[data-presence='rising'] .plate:nth-child(3) { animation-delay: 300ms; }
+  .lastCard[data-presence='leaving'] { opacity: 0; translate: 0 calc(100% + var(--cjt-space-md)); pointer-events: none; transition: opacity 200ms cubic-bezier(0.4, 0, 1, 1), translate 200ms cubic-bezier(0.4, 0, 1, 1); }
 }
-@media (max-width: 1199px) { .againInner { padding-inline: var(--cjt-space-lg); } }
-@media (max-width: 899px) { .againInner { padding-inline: var(--cjt-space-sm); } }
-/* On a narrow phone the action takes its own line, full width, so the price never squeezes the order. */
-@media (max-width: 479px) {
-  .againInner:has(.againButton) { flex-direction: column; align-items: stretch; gap: var(--cjt-space-xs); }
-  .againFace { justify-content: center; }
+@keyframes card-in {
+  from { opacity: 0; translate: 0 calc(100% + var(--cjt-space-md)); }
+}
+@keyframes plate-in {
+  from { opacity: 0; scale: 0.6; }
 }

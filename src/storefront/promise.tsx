@@ -16,12 +16,26 @@ export function usePickupPromise(store: Storefront, lines?: readonly CartLine[])
   return pickupPromise(store, now, lines ? servingWindow(store, lines)?.span : undefined);
 }
 
-/** One line, "Open now · Pick-up today from 2:30pm". It holds its line while the page wakes, so nothing below it moves. */
+/** Said wherever an order would start while staff have paused online orders. */
+export const PAUSED = 'Online orders are paused. You can still order at the counter.';
+
+/** "Open now · Pick-up today from 2:30pm". */
+export const promiseLine = (promise: NonNullable<ReturnType<typeof usePickupPromise>>) => `${promise.isOpen ? 'Open now' : 'Closed now'} · ${promise.soonest}`;
+
+/** One line, "Open now · Pick-up today from 2:30pm", or why online orders are paused. It holds its line while the page wakes, so nothing below it moves. */
 export function PickupPromise({store}: {store: Storefront}) {
   const promise = usePickupPromise(store);
+  const {ordersPaused} = useAvailability();
+  if (ordersPaused) {
+    return (
+      <span className={s.promise} data-shown="">
+        <Type role="body">{PAUSED}</Type>
+      </span>
+    );
+  }
   return (
     <span className={s.promise} data-open={promise?.isOpen ? '' : undefined} data-shown={promise ? '' : undefined}>
-      <Type role="body">{promise ? `${promise.isOpen ? 'Open now' : 'Closed now'} · ${promise.soonest}` : ' '}</Type>
+      <Type role="body">{promise ? promiseLine(promise) : ' '}</Type>
     </span>
   );
 }

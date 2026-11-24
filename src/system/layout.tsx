@@ -19,7 +19,7 @@ export function Page({top, bottom, children}: {top?: ReactNode; bottom?: ReactNo
   return (
     <>
       {top}
-      <main>{children}</main>
+      <main tabIndex={-1}>{children}</main>
       {bottom}
     </>
   );

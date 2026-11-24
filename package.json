@@ -15,6 +15,7 @@
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "marks": "node scripts/build-marks.mjs",
     "email-art": "node scripts/build-email-art.mjs",
+    "photos": "node scripts/build-photos.mjs",
     "spec": "node scripts/spec-check.mjs",
     "fit": "node scripts/fit-check.mjs",
     "walk": "node scripts/walk.mjs",

@@ -14,7 +14,8 @@ import {photoFor} from '../storefront/photos';
 import {Media, StoreHeader} from '../storefront/sections';
 import {suggestionsFor} from '../storefront/suggest';
 import {useAvailability} from './availability-store';
-import {formatSpan} from '../storefront/hours';
+import {formatSpan, midSentence} from '../storefront/hours';
+import {footRef} from '../storefront/foot';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
 import {count as counted, list} from '../lib/format';
@@ -30,6 +31,7 @@ import s from './orders.module.css';
 const DETAILS_KEY = 'cjt.customer.v1';
 const METHOD_KEY = 'cjt.method.v1';
 const NO_DETAILS: Customer = {name: '', phone: '', email: '', note: ''};
+const payHeight = footRef('foot-pay');
 
 /** The details saved from the last order; the note is never kept. */
 function readDetails(): Customer {
@@ -95,13 +97,13 @@ function AddOns({lines}: {lines: readonly CartLine[]}) {
   if (ordersPaused || inBag.has(TEST_DISH.id) || shown.length === 0) return null;
   return (
     <section className={s.addOns} aria-labelledby="add-ons">
-      <Label ink="secondary" as="h3" id="add-ons">Add to your order</Label>
-      <ul className={s.addOnList}>
+      <Label ink="secondary" as="h3" id="add-ons">Add to your bag</Label>
+      <ul className={s.addOnList} data-fit="scrolls">
         {shown.map((dish) => (
           // Once added the dish leaves this row for the bag above; focus follows it there, to its stepper.
           <li key={dish.id} className={s.addOn} onClick={() => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-line="${dish.id}"] button:last-of-type`)?.focus())}>
             <span className={s.addOnMedia}>
-              <Media id={dish.id} alt="" ratio="1 / 1" drawing={dish.drawing} />
+              <Media id={dish.id} alt="" ratio="1 / 1" sizes="120px" drawing={dish.drawing} />
               <span className={s.addOnCorner}>
                 <AddToBag dish={dish} onOpen={() => undefined} />
               </span>
@@ -198,7 +200,7 @@ export function Checkout() {
         setLoadError(null);
         setOptions(result);
       },
-      () => live && setLoadError({message: 'Could not reach the shop. Check your connection and try again.', canRetry: true}),
+      () => live && setLoadError({message: 'Couldn’t reach the shop. Check your connection and try again.', canRetry: true}),
     );
     return () => {
       live = false;
@@ -296,7 +298,7 @@ export function Checkout() {
       setError(result.message);
       setEditing(true);
     } catch {
-      setError('Could not reach the shop. Nothing was charged; check your connection and try again.');
+      setError('Couldn’t reach the shop, and nothing was taken. Check your connection and try again.');
     }
     submitting.current = false;
     setPlacing(false);
@@ -318,7 +320,7 @@ export function Checkout() {
       <div className={s.layout}>
         <aside className={s.summary} aria-labelledby="bag">
           <span className={s.stepHead}>
-            <Type role="subhead" as="h2" id="bag" className={s.stepTitle}>Your order</Type>
+            <Type role="subhead" as="h2" id="bag" className={s.stepTitle}>Your bag</Type>
             <Type role="body" ink="secondary" className={s.money}>{counted(itemCount, 'item', 'items')}</Type>
           </span>
           <ul className={s.lines}>
@@ -329,7 +331,7 @@ export function Checkout() {
               const unit = unitSen.get(line.dishId);
               return (
                 <li key={line.dishId} className={s.line} data-line={line.dishId}>
-                  {photo ? <img src={photo} alt="" className={s.thumb} /> : <span className={s.thumb} aria-hidden />}
+                  {photo ? <img src={photo.src} srcSet={photo.srcSet} sizes="56px" alt="" className={s.thumb} decoding="async" /> : <span className={s.thumb} aria-hidden />}
                   <span className={s.lineText}>
                     <Type role="body">{dish.name}</Type>
                     <Type role="body" className={s.money}>{unit === undefined ? ' ' : formatRM(unit * line.quantity)}</Type>
@@ -388,8 +390,8 @@ export function Checkout() {
             {editing ? (
               <Stack gap="md">
                 <TextInput label="Name" description="We call this name at the counter." value={details.name} onChange={update('name')} autoComplete="name" status={fieldStatus('name')} statusVariant="detached" isRequired />
-                <TextInput label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" description="For example 012-345 6789." value={details.phone} onChange={update('phone')} status={fieldStatus('phone')} statusVariant="detached" isRequired />
-                <TextInput label="Email" type="email" inputMode="email" autoComplete="email" hasAutoCorrect={false} description="We email your receipt, and again when it’s ready." value={details.email} onChange={update('email')} status={fieldStatus('email')} statusVariant="detached" isRequired />
+                <TextInput label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" description="A Malaysian mobile number, for example 012-345 6789." value={details.phone} onChange={update('phone')} status={fieldStatus('phone')} statusVariant="detached" isRequired />
+                <TextInput label="Email" type="email" inputMode="email" autoComplete="email" hasAutoCorrect={false} description="We email your receipt, and again when your order is ready." value={details.email} onChange={update('email')} status={fieldStatus('email')} statusVariant="detached" isRequired />
               </Stack>
             ) : (
               <Field as="span" colour="cream-100" outlined={false} className={s.who}>
@@ -402,21 +404,21 @@ export function Checkout() {
 
           <Step n={3} id="how" title="Payment">
             {options === null && !loadError ? <Type role="body">Loading ways to pay…</Type> : null}
-            <Choices legend="Payment method" name="method" look="rows" options={choices} value={activeMethod} onChange={choose} />
+            <Choices legend="Way to pay" name="method" look="rows" options={choices} value={activeMethod} onChange={choose} />
             <Type role="caption" ink="secondary">You pay on our payment partner’s secure page, then come back here to follow your order.</Type>
           </Step>
 
-          <div className={s.payBar}>
+          <div ref={payHeight} className={s.payBar}>
             {/* Rendered empty first, so a problem that appears in it is announced. */}
             <div role="alert">{problem ? <Banner status="error" title={problem} /> : null}</div>
             {loadError?.canRetry ? (
               <Cta onClick={retry}>Try again</Cta>
             ) : (
-              <Cta type="submit" busy={placing} isDisabled={!pricedNow || slots.length === 0 || loadError !== null}>
-                {placing ? 'Opening payment…' : options && pricedNow ? `Pay ${formatRM(options.cart.totalSen)}` : options && loadError === null ? 'Updating total…' : 'Pay'}
+              <Cta type="submit" busy={placing} isDisabled={!pricedNow || slots.length === 0 || loadError !== null} value={!placing && options && pricedNow ? formatRM(options.cart.totalSen) : undefined}>
+                {placing ? 'Opening payment…' : options && !pricedNow && loadError === null ? 'Updating total…' : 'Pay'}
               </Cta>
             )}
-            {activeSlot ? <Type role="caption" ink="secondary">Pick-up {activeSlot.day}, {activeSlot.time}</Type> : null}
+            {activeSlot ? <Type role="caption" ink="secondary">Pick-up {midSentence(activeSlot.day)}, {activeSlot.time}</Type> : null}
           </div>
         </form>
       </div>

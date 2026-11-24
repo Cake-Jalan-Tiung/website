@@ -216,6 +216,29 @@
       "on": "text-area",
       "only": true,
       "mode": "light"
+    },
+    {
+      "thing": "--color-accent-muted",
+      "value": "#031CFE",
+      "source": "token",
+      "on": "text-input",
+      "only": true,
+      "mode": "light"
+    },
+    {
+      "thing": "--color-accent-muted",
+      "value": "#031CFE",
+      "source": "token",
+      "on": "text-area",
+      "only": true,
+      "mode": "light"
+    },
+    {
+      "thing": "--color-warning-muted",
+      "value": "#FFB08A",
+      "source": "token",
+      "on": "banner",
+      "mode": "light"
     }
   ],
   "lifted": [],

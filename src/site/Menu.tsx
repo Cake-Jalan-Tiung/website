@@ -1,14 +1,17 @@
 import {Link} from '@astryxdesign/core/Link';
 import {Band, Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
-import {CategoryRail, MenuList, Sections, StoreFooter, StoreHeader, StoreSection} from '../storefront/sections';
+import {CategoryRail, DishStrip, MenuList, Sections, StoreFooter, StoreHeader, StoreSection} from '../storefront/sections';
+import {dishesById} from '../storefront/model';
 import {BagBar} from '../storefront/bag';
 import {DishSheet} from '../storefront/sheet';
 import {formatSpan} from '../storefront/hours';
 import {PickupPromise} from '../storefront/promise';
 import {storefront} from './content';
 
-/** The whole menu: a short line on how ordering works, the category rail, then every category as rows. */
+const BEST_SELLERS = {id: 'best-sellers', name: 'Best sellers'};
+
+/** The whole menu: a short line on how ordering works, the category rail, the best sellers to choose from first, then every category as rows. */
 export function Menu() {
   return (
     <Page top={<StoreHeader store={storefront} onMenu />} bottom={<StoreFooter store={storefront} />}>
@@ -29,8 +32,11 @@ export function Menu() {
           </Type>
         </Stack>
       </Band>
-      <CategoryRail categories={storefront.categories} />
-      <Sections>
+      <CategoryRail categories={[BEST_SELLERS, ...storefront.categories]} />
+      <Sections dense>
+        <StoreSection id={BEST_SELLERS.id} title={BEST_SELLERS.name}>
+          <DishStrip dishes={dishesById(storefront, storefront.bestSellers)} />
+        </StoreSection>
         {storefront.categories.map((category) => (
           <StoreSection key={category.id} id={category.id} title={category.name} note={category.servedBetween && `Served ${formatSpan(category.servedBetween)}`}>
             <MenuList dishes={category.dishes} store={storefront} />

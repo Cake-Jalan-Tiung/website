@@ -75,3 +75,6 @@
 .pink { color: var(--cjt-color-pink); }
 .ink-60 { color: var(--cjt-color-ink-60); }
 .ink-muted { color: var(--cjt-color-ink-muted); }
+
+/* Headings break into even lines, so none ends on a lone word. */
+:is(h1, h2, h3):is(.label, .caption, .body, .subhead, .head, .display) { text-wrap: balance; }

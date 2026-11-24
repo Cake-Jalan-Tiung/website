@@ -1,4 +1,4 @@
-import {createContext, useContext, type HTMLAttributes} from 'react';
+import {createContext, useContext, type HTMLAttributes, type RefCallback} from 'react';
 import {legalText, type Ground} from './model';
 import {colorVar, type ColorName} from './tokens';
 import f from './field.module.css';
@@ -15,6 +15,7 @@ type FieldProps = Omit<HTMLAttributes<HTMLElement>, 'color'> & {
   as?: 'div' | 'span' | 'section' | 'article' | 'header' | 'footer' | 'nav';
   /** Paper is outlined unless told otherwise, or it would vanish on the page. */
   outlined?: boolean;
+  ref?: RefCallback<HTMLElement>;
 };
 
 /**

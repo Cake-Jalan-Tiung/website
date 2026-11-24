@@ -14,3 +14,22 @@ html {
   text-size-adjust: 100%;
 }
 :is(a, button, label, select, summary) { touch-action: manipulation; }
+
+/* What is pinned to the foot of the screen reports its height (src/storefront/foot.ts): the bag
+   bar, the last-order card, checkout's Pay. A control reached by Tab, or a place jumped to, stops
+   above all of them, never under. */
+html { scroll-padding-bottom: calc(var(--foot-bar, 0px) + var(--foot-card, 0px) + var(--foot-pay, 0px) + var(--cjt-space-md, 24px)); }
+
+/* The page, or the place its link named, takes focus after a move in place (AfterNavigate in the
+   root route); neither is a control, so no ring. */
+main:focus, [tabindex='-1']:focus:not(:focus-visible) { outline: none; }
+
+/* Moving between pages in place (the router's view transition): the old page gives way to the new
+   in a short fade while the header and the bag bar, named in storefront.module.css, hold still. */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: 180ms; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}

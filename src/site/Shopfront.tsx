@@ -62,9 +62,13 @@ export function Shopfront({dishes, more}: {dishes: readonly Dish[]; more: Action
   const back = useRef<HTMLButtonElement>(null);
   const moved = useRef(false);
 
+  // Focus follows the customer in once the counter can be seen (it fades up from 850ms), and back
+  // out at once; with reduced motion the views swap, so it moves at once both ways.
   useEffect(() => {
     if (!moved.current) return;
-    (inside ? back : door).current?.focus({preventScroll: true});
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(() => (inside ? back : door).current?.focus({preventScroll: true}), inside && !still ? 900 : 0);
+    return () => window.clearTimeout(timer);
   }, [inside]);
 
   const go = (next: boolean) => {
@@ -76,7 +80,7 @@ export function Shopfront({dishes, more}: {dishes: readonly Dish[]; more: Action
   return (
     <span className={f.shopfront}>
       {/* The scene clips on purpose: going in, the street scales up past its edges. */}
-      <span className={f.scene} data-inside={inside ? '' : undefined} data-fit="clips">
+      <span className={f.scene} data-inside={inside ? '' : undefined} data-knocked={visits > 0 ? '' : undefined} data-fit="clips">
         <span className={f.outside} inert={inside}>
           <svg viewBox="0 0 1000 1100" className={f.street} aria-hidden>
             <defs>
@@ -239,10 +243,73 @@ export function Shopfront({dishes, more}: {dishes: readonly Dish[]; more: Action
       </span>
       <span className={f.hint} data-hidden={inside ? '' : undefined} aria-hidden>
         <Type role="caption" ink="secondary">
-          Tap the door to step inside.
+          Open the door to step inside.
         </Type>
       </span>
     </span>
+  );
+}
+
+/**
+ * The street to the shop's left, for a wide window: the neighbour's cream-washed wall, which the
+ * hero's words are painted on, with a drainpipe at the join, the street's name plate, a meter box
+ * and its cable, a high window and a potted plant; the five-foot way, kerb and road run on from
+ * the shop's. In the shop's units (1100 tall), 1600 wide, anchored to its right edge, so its bands
+ * meet the shop's exactly and a narrower window crops it from the far end.
+ */
+export function Street({plate}: {plate: readonly [street: string, area: string]}) {
+  const joints = Array.from({length: 8}, (_, i) => `M${i * 200 + 60} 874 V978`).join(' ');
+  return (
+    <svg viewBox="0 0 1600 1100" preserveAspectRatio="xMaxYMid slice" className={f.wide} aria-hidden>
+      {/* The wall, washed cream, a painted plinth along its foot. */}
+      <rect x="0" y="0" width="1600" height="874" className={f.wash} />
+      <rect x="0" y="806" width="1600" height="68" className={f.plinth} />
+      <path d="M0 806 H1600" className={f.line} />
+
+      {/* A high window, far along, barred, with its sill. */}
+      <rect x="160" y="70" width="190" height="150" className={f.glass} />
+      <path d="M160 70 H350 V220 H160 Z M207 70 V220 M255 70 V220 M302 70 V220" className={f.line} />
+      <path d="M146 232 H364" className={f.heavy} />
+
+      {/* The meter box's cable, running up the wall behind the plate. */}
+      <path d="M1430 0 V668" className={f.conduit} />
+
+      {/* The street's name on a plate by the corner, high up. */}
+      <rect x="1214" y="54" width="304" height="104" className={f.plate} />
+      <rect x="1224" y="64" width="284" height="84" className={f.plateRule} />
+      <text x="1366" y="108" className={f.plateName}>
+        {plate[0].toUpperCase()}
+      </text>
+      <text x="1366" y="136" className={f.plateArea}>
+        {plate[1].toUpperCase()}
+      </text>
+
+      {/* The meter box, low on the wall above the plinth. */}
+      <rect x="1384" y="668" width="92" height="124" className={f.paper} />
+      <rect x="1400" y="684" width="60" height="36" className={f.glass} />
+      <path d="M1400 684 H1460 V720 H1400 Z M1398 752 H1462 M1398 768 H1462" className={f.thin} />
+
+      {/* A pot by the wall, a few leaves up out of it. */}
+      <g transform="translate(1212 874)">
+        {[-30, -14, 2, 18, 32].map((angle, i) => (
+          <path key={angle} transform={`rotate(${angle})`} d={`M-5 -60 Q 0 ${-60 - 70 - (i % 2) * 24} 0 ${-60 - 96 - (i % 2) * 30} Q 4 ${-60 - 70} 6 -60 Z`} className={f.blade} />
+        ))}
+        <path d="M-50 -66 H50 L38 0 H-38 Z" className={f.pot} />
+      </g>
+
+      {/* The drainpipe at the join, bracketed to the wall, turning out at its foot. */}
+      <rect x="1548" y="0" width="28" height="846" className={f.pipe} />
+      <path d="M1542 210 H1582 M1542 470 H1582 M1542 730 H1582" className={f.line} />
+      <path d="M1548 846 V858 Q1548 872 1530 872 H1512 V846 Z" className={f.pipe} />
+
+      {/* The five-foot way, the kerb and the road, as at the shop. */}
+      <rect x="0" y="874" width="1600" height="104" className={f.concrete} />
+      <path d={joints} className={f.thin} />
+      <path d="M0 874 H1600" className={f.heavy} />
+      <rect x="0" y="978" width="1600" height="20" className={f.paper} />
+      <path d="M0 978 H1600 M0 998 H1600" className={f.line} />
+      <rect x="0" y="998" width="1600" height="102" className={f.road} />
+    </svg>
   );
 }
 

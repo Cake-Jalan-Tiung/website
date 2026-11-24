@@ -1,11 +1,14 @@
 import {BurungTiung, TiungCat} from '../marks/marks.generated';
 import {Page} from '../system/layout';
-import {CategoryTiles, DishGrid, Facts, Hero, Sections, SeasonBand, StoreFooter, StoreHeader, StoreSection, Visit} from '../storefront/sections';
+import {CategoryTiles, DishGrid, Facts, Hero, Sections, SeasonBand, StoreFooter, StoreHeader, StoreSection, Visit, heroIdle} from '../storefront/sections';
 import {dishesById} from '../storefront/model';
 import {BagBar} from '../storefront/bag';
 import {DishSheet} from '../storefront/sheet';
-import {promise, storefront} from './content';
-import {Shopfront} from './Shopfront';
+import {address, promise, storefront} from './content';
+import {Shopfront, Street} from './Shopfront';
+
+// The street plate names the road the shop is on: its address's first line without the number.
+const streetName = address.lines[0].replace(/^\d+,\s*/, '');
 
 export function Site() {
   return (
@@ -15,6 +18,7 @@ export function Site() {
         art={{engine: 'alive', ground: 'cream-100', mark: BurungTiung}}
         store={storefront}
         visual={storefront.counter ? <Shopfront dishes={dishesById(storefront, storefront.counter.dishes)} more={storefront.menu} /> : undefined}
+        street={<Street plate={[streetName, address.lines[1]]} />}
       />
       <Sections>
         <Facts facts={storefront.facts} />
@@ -27,7 +31,7 @@ export function Site() {
       </Sections>
       <SeasonBand store={storefront} id="in-season" />
       <Visit store={storefront} id="visit" art={{engine: 'alive', ground: 'cream-400', mark: TiungCat}} />
-      <BagBar store={storefront} />
+      <BagBar store={storefront} idle={heroIdle(storefront)} />
       <DishSheet store={storefront} />
     </Page>
   );
