@@ -23,6 +23,10 @@ export default defineConfig({
       // Failure alerts by email (src/ops/alert.server.ts), sent from hazli.dev to ALERT_TO.
       ALERT_EMAIL: bindings.sendEmail({allowedSenderAddresses: ['alerts@hazli.dev']}),
       ALERT_TO: bindings.secret(),
+      // The customer's order emails (src/orders/notify.server.ts): a receipt once paid, a note once ready.
+      ORDER_EMAIL: bindings.sendEmail({allowedSenderAddresses: ['orders@hello.cakejalantiung.app']}),
+      // Where links in those emails point; the 5-minute job has no request to read it from.
+      SITE_URL: bindings.text('https://cakejalantiung.app'),
     },
     // The shop's own address. workers.dev stays on beside it: payments started there return
     // there, and links to it keep working.

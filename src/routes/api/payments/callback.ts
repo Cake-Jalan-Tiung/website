@@ -3,6 +3,7 @@ import {env} from 'cloudflare:workers';
 import {ordersRepo} from '../../../orders/repo.server';
 import {paymentProvider} from '../../../payments/select.server';
 import {alertLater} from '../../../ops/alert.server';
+import {notifyLater} from '../../../orders/notify.server';
 
 /**
  * The payment provider's callback. The event is verified from its raw body and confirmed with
@@ -19,7 +20,10 @@ export const Route = createFileRoute('/api/payments/callback')({
           const event = await paymentProvider(env).confirm(body, request.headers);
           if (!event) return new Response('unverified', {status: 401});
           const applied = await ordersRepo(env.DB, env.SHOP_ID).applyPayment(event, body, new Date());
-          if (applied) return new Response('ok');
+          if (applied) {
+            notifyLater(event.orderId);
+            return new Response('ok');
+          }
           alertLater({
             key: `callback-unknown:${event.purchaseId}`,
             subject: 'A verified CHIP payment names no order on this site',

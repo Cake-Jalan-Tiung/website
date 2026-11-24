@@ -25,7 +25,8 @@ Order cakes, pastries, coffee and meals online, pay by FPX, DuitNow, e-wallet or
 | Checkout on one page with Pay pinned: pick-up time inside opening hours, details and way to pay remembered, one optional row of add-ons | A customer who taps I'm here goes to the top of the board, in pink, with a ring |
 | Payment through [CHIP](https://www.chip-in.asia) (FPX, DuitNow QR, Touch 'n Go, GrabPay, cards) | Paid orders recorded as sales in StoreHub, cancelled on refund, with each order's StoreHub state on the kitchen screen |
 | An order page that follows the order to Ready, with I'm here near pick-up time; the last order one tap from every page, to track or to order again | An RM 1 staff test order to try real payments end to end |
-| Delivery still through Beep | Failure alerts by email |
+| A receipt by email once paid, and a second email once the order is ready, linking back to I'm here | Failure alerts by email |
+| Delivery still through Beep | |
 
 ## How it works
 

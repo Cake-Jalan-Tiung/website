@@ -1,15 +1,16 @@
 // The Worker's cron trigger, every 5 minutes: settle orders still waiting for payment, catch
-// refunds made in the provider's dashboard, then keep the POS in step. Each step runs even when
-// the one before it failed.
+// refunds made in the provider's dashboard, send order emails still owed, then keep the POS in
+// step. Each step runs even when the one before it failed.
 import {ordersRepo} from '../orders/repo.server';
 import {orderCode, settledStatus} from '../orders/model';
 import {paymentProvider} from '../payments/select.server';
 import type {PaymentState} from '../payments/provider';
 import {syncPosSales} from '../pos/sync.server';
+import {sendDueEmails} from '../orders/notify.server';
 import {catchRefunds} from './refunds';
 import {sendAlert} from './alert.server';
 
-type ScheduledEnv = {DB: D1Database; SHOP_ID: string; PAYMENTS: string; CHIP_SECRET_KEY: string; CHIP_BRAND_ID: string; STOREHUB_API_TOKEN: string};
+type ScheduledEnv = {DB: D1Database; SHOP_ID: string; PAYMENTS: string; CHIP_SECRET_KEY: string; CHIP_BRAND_ID: string; STOREHUB_API_TOKEN: string} & Parameters<typeof sendDueEmails>[0];
 
 const PER_RUN = 20;
 
@@ -50,6 +51,8 @@ export async function runScheduled(env: ScheduledEnv) {
   const steps: [string, () => Promise<void>][] = [
     ['settle unpaid orders', () => settleUnpaid(env)],
     ['catch refunds', () => catchRefunds({orders: ordersRepo(env.DB, env.SHOP_ID), provider: paymentProvider(env), alert: (alert) => sendAlert(alert), now: new Date()})],
+    // After settling, so an order the job just found paid gets its receipt in the same run.
+    ['send order emails', () => sendDueEmails(env)],
     ['record sales in StoreHub', () => syncPosSales(env)],
   ];
   for (const [name, step] of steps) {

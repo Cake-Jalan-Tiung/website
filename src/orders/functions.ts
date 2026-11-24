@@ -12,6 +12,7 @@ import type {PaymentMethod, PaymentState} from '../payments/provider';
 import {CartError, KITCHEN_STATUSES, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, settledStatus, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import {isOpenSlot, pickupSlots, type Slot} from './pickup';
 import {closuresRepo, ordersRepo, staffAttempts, type OrderRow} from './repo.server';
+import {notifyLater} from './notify.server';
 import {ORDERS_SUBJECT, assertAvailable, availabilityFrom, closureEnds, dishSubject, parseCloseFor, type Availability} from './availability';
 import {STAFF_COOKIE, STAFF_SESSION_DAYS, isStaffToken, issueStaffToken, sameSecret} from './staff-session.server';
 import {posStuckBefore, posState, posSyncOn, type PosBacklog, type PosState} from '../pos/status';
@@ -186,8 +187,9 @@ export const getOrder = createServerFn({method: 'GET'})
     }
     const now = new Date();
     const to = settledStatus(state, order.createdAt, now);
-    if (to && (await orders.move(id, to, now))) return toPublic({...order, status: to});
-    return toPublic(order);
+    if (!to || !(await orders.move(id, to, now))) return toPublic(order);
+    notifyLater(id);
+    return toPublic({...order, status: to});
   });
 
 /**
@@ -315,6 +317,7 @@ export const advanceOrder = createServerFn({method: 'POST'})
     const orders = repo();
     const order = await orders.get(id);
     const next = order && kitchenNext(order.status);
-    if (next && (await orders.move(id, next.to, new Date()))) return {ok: true};
-    return {ok: false, message: 'This order has already moved on.'};
+    if (!next || !(await orders.move(id, next.to, new Date()))) return {ok: false, message: 'This order has already moved on.'};
+    notifyLater(id);
+    return {ok: true};
   });

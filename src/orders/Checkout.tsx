@@ -389,7 +389,7 @@ export function Checkout() {
               <Stack gap="md">
                 <TextInput label="Name" description="We call this name at the counter." value={details.name} onChange={update('name')} autoComplete="name" status={fieldStatus('name')} statusVariant="detached" isRequired />
                 <TextInput label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" description="For example 012-345 6789." value={details.phone} onChange={update('phone')} status={fieldStatus('phone')} statusVariant="detached" isRequired />
-                <TextInput label="Email" type="email" inputMode="email" autoComplete="email" hasAutoCorrect={false} description="For your receipt." value={details.email} onChange={update('email')} status={fieldStatus('email')} statusVariant="detached" isRequired />
+                <TextInput label="Email" type="email" inputMode="email" autoComplete="email" hasAutoCorrect={false} description="We email your receipt, and again when it’s ready." value={details.email} onChange={update('email')} status={fieldStatus('email')} statusVariant="detached" isRequired />
               </Stack>
             ) : (
               <Field as="span" colour="cream-100" outlined={false} className={s.who}>
