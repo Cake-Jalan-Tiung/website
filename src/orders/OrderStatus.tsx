@@ -16,8 +16,10 @@ import {bag, settleBag} from './bag';
 import {useAvailability} from './availability-store';
 import {OrderTotal} from './Checkout';
 import {arriveForOrder, getOrder, type PublicOrder} from './functions';
-import {CUSTOMER_STEPS, arrivalOpensAt, canArrive, customerCopy, formatRM, isDormant, isFinished, type OrderStatus} from './model';
-import {formatShopTime} from '../storefront/hours';
+import {arrivalOpensAt, canArrive, formatRM, isDormant, type OrderStatus} from './model';
+import {journey} from './journey';
+import {formatDistance} from '../delivery/model';
+import {formatShopTime, midSentence} from '../storefront/hours';
 import {orderAgainLines, rememberOrder} from './recent';
 import {useNow} from '../storefront/now';
 import s from './orders.module.css';
@@ -41,10 +43,15 @@ const GROUND: Record<OrderStatus, Exclude<Ground, 'paper'>> = {
   refunded: 'chalk',
 };
 
+/** A delivery's ground: on its way is the moment the customer waits for, so it is the one on cobalt; ready is only a step towards it. */
+const deliveryGround = (status: OrderStatus, reached: number): Exclude<Ground, 'paper'> =>
+  reached === 2 ? 'blue' : reached === 3 ? 'cream-100' : status === 'ready' ? 'blue-50' : GROUND[status];
+
 export function OrderStatusPage({initial}: {initial: PublicOrder}) {
   const router = useRouter();
   const [order, setOrder] = useState(initial);
-  const finished = isFinished(order.status);
+  const trip = journey(order);
+  const finished = trip.finished;
 
   useEffect(() => {
     if (finished) return;
@@ -55,7 +62,7 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
     return () => window.clearInterval(timer);
   }, [order.id, order.status, finished]);
 
-  const reached = CUSTOMER_STEPS.findIndex((step) => step.status === order.status);
+  const reached = trip.reached;
   const inKitchen = reached >= 0;
   // Once the money is in, the bag that paid for it has done its job, and the order is one to come back to.
   useEffect(() => {
@@ -67,19 +74,21 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
   const availability = useAvailability();
   const again = orderAgainLines(order.items, availability);
 
-  const copy = customerCopy(order.status);
+  const copy = trip;
   // The tab's title says where the order is, so a glance at the tabs answers "is it ready?".
   useEffect(() => {
     document.title = `${copy.title} · ${order.code} — ${storefront.name}`;
   }, [copy.title, order.code]);
-  // Ready is the moment the customer waits for: a phone that can buzz, buzzes once.
-  const was = useRef(order.status);
+  // Ready, or on its way, is the moment the customer waits for: a phone that can buzz, buzzes once.
+  const moment = order.delivery ? order.delivery.state === 'on_the_way' : order.status === 'ready';
+  const was = useRef(moment);
   useEffect(() => {
-    if (order.status === 'ready' && was.current !== 'ready') navigator.vibrate?.([120, 80, 120]);
-    was.current = order.status;
-  }, [order.status]);
+    if (moment && !was.current) navigator.vibrate?.([120, 80, 120]);
+    was.current = moment;
+  }, [moment]);
 
-  const ground = GROUND[order.status];
+  const ground = order.delivery ? deliveryGround(order.status, reached) : GROUND[order.status];
+  const delivery = order.delivery;
   const retry = isDormant(order.status);
 
   return (
@@ -101,15 +110,20 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
           </Stack>
           {inKitchen ? (
             <ol className={s.progress} aria-label="Progress">
-              {CUSTOMER_STEPS.map((step, index) => (
-                <li key={step.status} data-done={index <= reached ? '' : undefined} aria-current={index === reached ? 'step' : undefined}>
-                  <Type role="caption">{step.label}</Type>
+              {trip.steps.map((label, index) => (
+                <li key={label} data-done={index <= reached ? '' : undefined} aria-current={index === reached ? 'step' : undefined}>
+                  <Type role="caption">{label}</Type>
                 </li>
               ))}
             </ol>
           ) : null}
-          {inKitchen && !finished ? <Arrival order={order} onArrived={setOrder} /> : null}
-          {order.status === 'collected' && again.length > 0 ? (
+          {inKitchen && !finished && !delivery ? <Arrival order={order} onArrived={setOrder} /> : null}
+          {delivery?.trackUrl ? (
+            <Link href={delivery.trackUrl} isExternalLink>
+              Follow the ride on the map
+            </Link>
+          ) : null}
+          {finished && order.status === 'collected' && again.length > 0 ? (
             <Cta
               onClick={() => {
                 bag.include(again);
@@ -125,15 +139,29 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
       </Field>
 
       <div className={s.details}>
-        <section className={s.block} aria-labelledby="pickup">
-          <Label ink="secondary" as="h2" id="pickup">{retry ? 'Pick-up, once paid' : 'Pick-up'}</Label>
-          <Type role="subhead" as="p">{formatShopTime(storefront.timeZone, order.pickupAt)}</Type>
-          <Type role="body">{storefront.address.join(', ')}</Type>
-          <Link href={storefront.mapHref} isExternalLink>Open in Google Maps</Link>
-          <Type role="caption" ink="secondary">
-            Questions? Call <Link href={storefront.phone.href}>{storefront.phone.display}</Link> and give the code {order.code}.
-          </Type>
-        </section>
+        {delivery ? (
+          <section className={s.block} aria-labelledby="delivery">
+            <Label ink="secondary" as="h2" id="delivery">{retry ? 'Delivery, once paid' : 'Delivery'}</Label>
+            <Type role="subhead" as="p">
+              {delivery.state === 'delivered' ? 'Delivered' : formatShopTime(storefront.timeZone, delivery.arrivesAt).replace(', ', ', about ')}
+            </Type>
+            <Type role="body">{delivery.address}</Type>
+            {delivery.rider ? <Type role="body">Your rider: {delivery.rider}</Type> : null}
+            <Type role="caption" ink="secondary">
+              Leaves the shop {midSentence(formatShopTime(storefront.timeZone, order.pickupAt))}. Questions? Call <Link href={storefront.phone.href}>{storefront.phone.display}</Link> and give the code {order.code}.
+            </Type>
+          </section>
+        ) : (
+          <section className={s.block} aria-labelledby="pickup">
+            <Label ink="secondary" as="h2" id="pickup">{retry ? 'Pick-up, once paid' : 'Pick-up'}</Label>
+            <Type role="subhead" as="p">{formatShopTime(storefront.timeZone, order.pickupAt)}</Type>
+            <Type role="body">{storefront.address.join(', ')}</Type>
+            <Link href={storefront.mapHref} isExternalLink>Open in Google Maps</Link>
+            <Type role="caption" ink="secondary">
+              Questions? Call <Link href={storefront.phone.href}>{storefront.phone.display}</Link> and give the code {order.code}.
+            </Type>
+          </section>
+        )}
 
         <section className={s.block} aria-labelledby="items">
           <Label ink="secondary" as="h2" id="items">Your order</Label>
@@ -144,6 +172,12 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
                 <Type role="body" className={s.money}>{formatRM(item.unitSen * item.quantity)}</Type>
               </li>
             ))}
+            {delivery ? (
+              <li className={s.itemLine}>
+                <Type role="body">Delivery · {formatDistance(delivery.distanceM)}</Type>
+                <Type role="body" className={s.money}>{formatRM(delivery.feeSen)}</Type>
+              </li>
+            ) : null}
           </ul>
           <OrderTotal totalSen={order.totalSen} />
         </section>

@@ -1,14 +1,16 @@
 // The receipt as a PDF, attached to the receipt email: the paper a customer keeps or claims as
 // an expense. A5, so it prints whole on A4. Drawn in the brand: the lockup on a cream band, Jost
 // for words and Paper Mono for what a till prints (the code, times and money). A long order runs
-// on to further pages under the same table head.
+// on to further pages under the same table head. A delivery's ride is a row of its own, so the
+// rows still make the total paid.
 import fontkit from '@pdf-lib/fontkit';
 import {PDFDocument, rgb, type PDFFont, type PDFImage, type PDFPage} from 'pdf-lib';
 import {color, type ColorName} from '../system/tokens';
 import {formatShopRecord} from '../storefront/hours';
 import type {Storefront} from '../storefront/model';
+import {formatDistance} from '../delivery/model';
 import {orderCode} from './model';
-import type {EmailOrder} from './email';
+import {deliveryArrival, type EmailOrder} from './email';
 // Static TrueType cuts, licences beside them in assets/fonts/: fontkit draws Jost's variable font
 // blank once subset, and hangs subsetting Paper Mono's WOFF2.
 import jostUrl from '../../assets/fonts/Jost-400-Book.ttf?inline';
@@ -92,7 +94,7 @@ export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<
     const known = new Set(font.getCharacterSet());
     return [...text.replace(/\s+/g, '')].every((char) => known.has(char.codePointAt(0) ?? -1));
   };
-  if (!drawable(fonts.sansMedium, order.customer.name) || !drawable(fonts.sans, order.customer.note)) return null;
+  if (!drawable(fonts.sansMedium, order.customer.name) || !drawable(fonts.sans, order.customer.note) || !drawable(fonts.sans, order.delivery?.address ?? '')) return null;
   const lockup = await doc.embedPng(bytes(lockupUrl));
   const icon = await doc.embedPng(bytes(iconUrl));
   const code = orderCode(order.id);
@@ -158,18 +160,21 @@ export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<
   y -= 18;
   text(`Paid ${formatShopRecord(store.timeZone, paidAt)}`, M, y, fonts.mono, 8.5, 'muted');
 
-  // Who and when.
+  // Who, and when and where they get it: at the counter, or at their street.
   y -= 22;
   rule(y, RULE);
   y -= 16;
   const half = M + inner / 2 + 8;
+  const handover = order.delivery
+    ? {label: 'Arrives about', at: deliveryArrival(store, order.pickupAt, order.delivery), place: `Delivered to ${order.delivery.address}`}
+    : {label: 'Pick-up', at: order.pickupAt, place: store.address.join(', ')};
   label('Customer', M, y);
-  label('Pick-up', half, y);
+  label(handover.label, half, y);
   y -= 15;
   const nameLines = wrap(order.customer.name.trim(), fonts.sansMedium, 10.5, half - M - 16);
   nameLines.forEach((line, index) => text(line, M, y - index * 14, fonts.sansMedium, 10.5));
-  text(formatShopRecord(store.timeZone, order.pickupAt), half, y, fonts.mono, 9.5);
-  const addressLines = wrap(store.address.join(', '), fonts.sans, 8.5, right - half);
+  text(formatShopRecord(store.timeZone, handover.at), half, y, fonts.mono, 9.5);
+  const addressLines = wrap(handover.place, fonts.sans, 8.5, right - half);
   addressLines.forEach((line, index) => text(line, half, y - 14 - index * 11.5, fonts.sans, 8.5, 'muted'));
   y -= Math.max(nameLines.length * 14, 14 + addressLines.length * 11.5) + 14;
 
@@ -177,7 +182,8 @@ export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<
   rule(y, RULE);
   y -= 16;
   tableHead();
-  for (const line of order.items) {
+  const rows = order.delivery ? [...order.items, {name: `Delivery · ${formatDistance(order.delivery.distanceM)}`, unitSen: order.delivery.feeSen, quantity: 1}] : order.items;
+  for (const line of rows) {
     const lines = wrap(line.name, fonts.sans, 10, dishWidth);
     const extra = (lines.length - 1) * 13;
     if (!fits(extra + 23)) nextPage(true);

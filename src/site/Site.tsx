@@ -1,3 +1,4 @@
+import {useDelivers} from '../storefront/delivers';
 import {BurungTiung, TiungCat} from '../marks/marks.generated';
 import {Page} from '../system/layout';
 import {CategoryTiles, DishGrid, Facts, Hero, Sections, SeasonBand, StoreFooter, StoreHeader, StoreSection, Visit, heroIdle} from '../storefront/sections';
@@ -11,6 +12,7 @@ import {Shopfront, Street} from './Shopfront';
 const streetName = address.lines[0].replace(/^\d+,\s*/, '');
 
 export function Site() {
+  const delivers = useDelivers();
   return (
     <Page top={<StoreHeader store={storefront} />} bottom={<StoreFooter store={storefront} />}>
       <Hero
@@ -31,7 +33,7 @@ export function Site() {
       </Sections>
       <SeasonBand store={storefront} id="in-season" />
       <Visit store={storefront} id="visit" art={{engine: 'alive', ground: 'cream-400', mark: TiungCat}} />
-      <BagBar store={storefront} idle={heroIdle(storefront)} />
+      <BagBar store={storefront} idle={heroIdle(storefront, delivers)} />
       <DishSheet store={storefront} />
     </Page>
   );

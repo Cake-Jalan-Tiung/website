@@ -14,7 +14,7 @@ import {photoFor} from '../storefront/photos';
 import {Media, StoreHeader} from '../storefront/sections';
 import {suggestionsFor} from '../storefront/suggest';
 import {useAvailability} from './availability-store';
-import {formatSpan, midSentence} from '../storefront/hours';
+import {formatMinutes, formatSpan, midSentence, shopClock} from '../storefront/hours';
 import {footRef} from '../storefront/foot';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
@@ -23,13 +23,20 @@ import {Page, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {bag, countOf, payingFor, useBag, useBagReady} from './bag';
 import {TEST_DISH, customerProblems, formatRM, orderableDish, type CartLine, type Customer, type CustomerField} from './model';
-import {getCheckoutOptions, placeOrder, type CheckoutOptions} from './functions';
+import {getCheckoutOptions, placeOrder, quoteDelivery, type CheckoutOptions, type DeliveryOffer} from './functions';
+import {DeliveryAddress, EMPTY_DRAFT, type Draft} from '../delivery/DeliveryAddress';
+import {STALE_FEE, formatDistance, metresBetween, parseDropOff, rideMinutes, type DropOff} from '../delivery/model';
+import d from '../delivery/delivery.module.css';
 import {settlePaying} from './settle';
 import type {PaymentMethod} from '../payments/provider';
 import s from './orders.module.css';
 
 const DETAILS_KEY = 'cjt.customer.v1';
 const METHOD_KEY = 'cjt.method.v1';
+/** The last delivery address and whether the last order was delivered. The pin is kept 30 days, as Google's terms allow. */
+const DROP_OFF_KEY = 'cjt.dropoff.v1';
+const FULFILMENT_KEY = 'cjt.fulfilment.v1';
+const DROP_OFF_DAYS = 30;
 const NO_DETAILS: Customer = {name: '', phone: '', email: '', note: ''};
 const payHeight = footRef('foot-pay');
 
@@ -45,6 +52,28 @@ function readDetails(): Customer {
 }
 
 const isComplete = (details: Customer) => Object.keys(customerProblems(details)).length === 0;
+
+type Fulfilment = 'pickup' | 'delivery';
+/** Where pricing a delivery stands: the fee on Pay comes only from `quoted`. */
+type Quote = {kind: 'none'} | {kind: 'quoting'} | {kind: 'quoted'; feeSen: number; distanceM: number; token: string} | {kind: 'refused'; message: string; canRetry: boolean};
+
+/** The address saved from the last delivery, while its pin is young enough to keep. */
+function readDropOff(): DropOff | null {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(DROP_OFF_KEY) ?? 'null');
+    const savedAt = typeof saved === 'object' && saved !== null && 'savedAt' in saved ? Number(saved.savedAt) : NaN;
+    if (!(Date.now() - savedAt < DROP_OFF_DAYS * 86_400_000)) return null;
+    return parseDropOff(saved, (message) => new Error(message));
+  } catch {
+    return null;
+  }
+}
+
+const toDraft = (dropOff: DropOff | null): Draft => (dropOff ? {...dropOff} : EMPTY_DRAFT);
+
+/** "3:05pm": when a delivery collected at `at` should arrive, on the shop's clock. */
+const arrivalTime = (offer: DeliveryOffer, at: string, metres: number) =>
+  formatMinutes(shopClock(storefront.timeZone, new Date(Date.parse(at) + rideMinutes({...offer, service: ''}, metres) * 60_000)).minutes);
 
 /** One choice per kind of payment: the card networks become a single Card. */
 function paymentChoices(methods: readonly PaymentMethod[]) {
@@ -156,6 +185,11 @@ export function Checkout() {
   // Field problems show once Pay has been tried, then follow the customer's typing.
   const [checked, setChecked] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [fulfilment, setFulfilment] = useState<Fulfilment>('pickup');
+  const [dropOff, setDropOff] = useState<DropOff | null>(null);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [quote, setQuote] = useState<Quote>({kind: 'none'});
+  const quoting = useRef(0);
 
   // If this bag has been paid for already (the payment page never came back here), the customer
   // goes to that order instead of being offered Pay again. Asked on arrival, when a phone
@@ -187,6 +221,8 @@ export function Checkout() {
     setDetails(saved);
     setEditing(!isComplete(saved));
     setMethod(window.localStorage.getItem(METHOD_KEY));
+    setDropOff(readDropOff());
+    if (window.localStorage.getItem(FULFILMENT_KEY) === 'delivery') setFulfilment('delivery');
   }, []);
 
   // `lines` is the bag store's own snapshot, so it changes identity only when the bag does.
@@ -206,6 +242,28 @@ export function Checkout() {
       live = false;
     };
   }, [lines, attempt]);
+
+  const offer = options?.delivery ?? null;
+  const delivering = fulfilment === 'delivery' && offer !== null && !offer.paused;
+
+  /** Prices the ride to a confirmed address; only the latest answer counts. */
+  const price = (target: DropOff) => {
+    const ask = ++quoting.current;
+    setQuote({kind: 'quoting'});
+    quoteDelivery({data: {place: target.place, address: target.address}}).then(
+      (result) => {
+        if (ask !== quoting.current) return;
+        setQuote(result.ok ? {kind: 'quoted', feeSen: result.feeSen, distanceM: result.distanceM, token: result.token} : {kind: 'refused', message: result.message, canRetry: result.canRetry ?? false});
+      },
+      () => ask === quoting.current && setQuote({kind: 'refused', message: 'Couldn’t reach the shop to price delivery. Check your connection and try again.', canRetry: true}),
+    );
+  };
+
+  // A remembered address is priced as soon as delivery is the choice and the shop offers it.
+  useEffect(() => {
+    if (delivering && dropOff && !editingAddress && quote.kind === 'none') price(dropOff);
+    // `price` is stable in effect: it reads only refs and setters.
+  }, [delivering, dropOff, editingAddress, quote.kind]);
 
   if (!ready) {
     return (
@@ -228,6 +286,22 @@ export function Checkout() {
       </Shell>
     );
   }
+
+  const feeSen = delivering && quote.kind === 'quoted' ? quote.feeSen : 0;
+  // The ride's length for arrival times: Lalamove's route once priced, the straight line before.
+  const rideMetres = delivering && dropOff && offer ? (quote.kind === 'quoted' ? quote.distanceM : metresBetween(offer.from, dropOff.place)) : null;
+  const arrival = (at: string) => (offer && rideMetres !== null ? arrivalTime(offer, at, rideMetres) : null);
+  const chooseFulfilment = (value: string) => {
+    setFulfilment(value === 'delivery' ? 'delivery' : 'pickup');
+    setError(null);
+    if (value === 'delivery' && !dropOff) setEditingAddress(true);
+  };
+  const confirmAddress = (confirmed: DropOff) => {
+    setDropOff(confirmed);
+    setEditingAddress(false);
+    setError(null);
+    price(confirmed);
+  };
 
   // The chosen time holds while it is still offered; otherwise the earliest is chosen.
   const slots = options?.slots ?? [];
@@ -276,7 +350,10 @@ export function Checkout() {
 
   async function pay() {
     if (submitting.current || !pricedNow) return;
-    if (!activeSlot) return showStep('when', 'Choose a pick-up time.');
+    if (delivering && (!dropOff || editingAddress)) return showStep('when', 'Confirm your delivery address.');
+    if (delivering && quote.kind === 'refused') return showStep('when', quote.message);
+    if (delivering && quote.kind !== 'quoted') return showStep('when', 'Delivery is still being priced. Try again in a moment.');
+    if (!activeSlot) return showStep('when', delivering ? 'Choose a delivery time.' : 'Choose a pick-up time.');
     const found = Object.values(customerProblems(details));
     if (found.length > 0) {
       setChecked(true);
@@ -289,14 +366,19 @@ export function Checkout() {
     setPlacing(true);
     window.localStorage.setItem(DETAILS_KEY, JSON.stringify({...details, note: ''}));
     window.localStorage.setItem(METHOD_KEY, activeMethod);
+    window.localStorage.setItem(FULFILMENT_KEY, delivering ? 'delivery' : 'pickup');
+    if (delivering && dropOff) window.localStorage.setItem(DROP_OFF_KEY, JSON.stringify({...dropOff, savedAt: Date.now()}));
+    const ride = delivering && dropOff && quote.kind === 'quoted' ? {dropOff, token: quote.token} : undefined;
     try {
-      const result = await placeOrder({data: {cart: lines, customer: details, pickupAt: activeSlot.at, method: activeMethod}});
+      const result = await placeOrder({data: {cart: lines, customer: details, pickupAt: activeSlot.at, method: activeMethod, delivery: ride}});
       if (result.ok) {
         payingFor(result.orderId, lines);
         return window.location.assign(result.redirectUrl);
       }
       setError(result.message);
-      setEditing(true);
+      // An expired or mismatched fee is priced again at once; the customer only presses Pay again.
+      if (result.message === STALE_FEE && dropOff) price(dropOff);
+      else setEditing(true);
     } catch {
       setError('Couldn’t reach the shop, and nothing was taken. Check your connection and try again.');
     }
@@ -342,19 +424,59 @@ export function Checkout() {
             })}
           </ul>
           <AddOns lines={lines} />
-          <OrderTotal totalSen={shownTotal} />
+          {delivering && quote.kind === 'quoted' ? (
+            <span className={d.feeRow}>
+              <Type role="body">Delivery · {formatDistance(quote.distanceM)}</Type>
+              <Type role="body" className={d.money}>{formatRM(quote.feeSen)}</Type>
+            </span>
+          ) : null}
+          <OrderTotal totalSen={shownTotal === undefined ? undefined : shownTotal + feeSen} />
           <Link href={storefront.menu.href}>Add more from the menu</Link>
         </aside>
 
         <form className={s.form} onSubmit={(event) => { event.preventDefault(); void pay(); }} noValidate>
-          <Step n={1} id="when" title="Pick-up">
-            <Type role="body" ink="secondary">
-              At the counter, {storefront.address.slice(0, 2).join(', ')}.
-              {limits ? ` ${list(limits.categories)} ${limits.categories.length === 1 ? 'is' : 'are'} served ${formatSpan(limits.span)}, so times stay inside those hours.` : ''}
-            </Type>
+          <Step n={1} id="when" title={offer ? 'Pick-up or delivery' : 'Pick-up'}>
+            {offer && !offer.paused ? (
+              <Choices
+                legend="How you get it"
+                name="fulfilment"
+                look="chips"
+                options={[{value: 'pickup', label: 'Pick-up'}, {value: 'delivery', label: 'Delivery'}]}
+                value={delivering ? 'delivery' : 'pickup'}
+                onChange={chooseFulfilment}
+              />
+            ) : null}
+            {offer?.paused ? <Type role="body" ink="secondary">Delivery is paused for now. Pick-up is open.</Type> : null}
+            {delivering && offer ? (
+              dropOff && !editingAddress ? (
+                <Field as="span" colour="cream-100" outlined={false} className={d.chosen}>
+                  <span className={s.stepHead}>
+                    <Type role="body" className={s.stepTitle}>{dropOff.unit}</Type>
+                    <button type="button" className={s.textButton} onClick={() => setEditingAddress(true)}><Label ink="blue">Change</Label></button>
+                  </span>
+                  <Type role="body" ink="secondary">{dropOff.address}</Type>
+                  {dropOff.note ? <Type role="caption" ink="secondary">For the rider: {dropOff.note}</Type> : null}
+                  <Type role="caption" ink="secondary" aria-live="polite">
+                    {quote.kind === 'quoted' ? `${formatDistance(quote.distanceM)} from the shop · Delivery ${formatRM(quote.feeSen)}` : quote.kind === 'quoting' ? 'Pricing delivery…' : ''}
+                  </Type>
+                  {quote.kind === 'refused' ? <Banner status="warning" title={quote.message} /> : null}
+                  {quote.kind === 'refused' && quote.canRetry ? <button type="button" className={s.textButton} onClick={() => price(dropOff)}><Label ink="blue">Try again</Label></button> : null}
+                </Field>
+              ) : (
+                <DeliveryAddress offer={offer} initial={toDraft(dropOff)} onConfirm={confirmAddress} />
+              )
+            ) : (
+              <Type role="body" ink="secondary">
+                At the counter, {storefront.address.slice(0, 2).join(', ')}.
+                {limits ? ` ${list(limits.categories)} ${limits.categories.length === 1 ? 'is' : 'are'} served ${formatSpan(limits.span)}, so times stay inside those hours.` : ''}
+              </Type>
+            )}
+            {delivering && limits ? (
+              <Type role="body" ink="secondary">{`${list(limits.categories)} ${limits.categories.length === 1 ? 'is' : 'are'} served ${formatSpan(limits.span)}, so times stay inside those hours.`}</Type>
+            ) : null}
             {options === null && !loadError ? <Type role="body">Finding times…</Type> : null}
             {options && slots.length === 0 ? (
-              <Banner status="warning" title="No pick-up times left" description="Nothing in this bag can be ready before closing in the next few days. Try removing items with limited hours, or come back tomorrow." />
+              <Banner status="warning" title={delivering ? 'No delivery times left' : 'No pick-up times left'} description="Nothing in this bag can be ready before closing in the next few days. Try removing items with limited hours, or come back tomorrow." />
             ) : null}
             {days.length > 1 ? (
               <Choices
@@ -368,13 +490,16 @@ export function Checkout() {
             ) : null}
             {times.length > 0 ? (
               <label className={s.select}>
-                <Label ink="secondary">Time</Label>
+                <Label ink="secondary">{delivering ? (rideMetres !== null ? 'Arrives about' : 'Leaves the shop') : 'Time'}</Label>
                 <select value={activeSlot?.at} onChange={(event) => setSlot(event.target.value)}>
-                  {times.map((option) => (
-                    <option key={option.at} value={option.at}>
-                      {option.at === slots[0]?.at ? `${option.time}, earliest` : option.time}
-                    </option>
-                  ))}
+                  {times.map((option) => {
+                    const time = (delivering && arrival(option.at)) || option.time;
+                    return (
+                      <option key={option.at} value={option.at}>
+                        {option.at === slots[0]?.at ? `${time}, earliest` : time}
+                      </option>
+                    );
+                  })}
                 </select>
                 <span className={s.chevron} aria-hidden />
               </label>
@@ -389,8 +514,8 @@ export function Checkout() {
           >
             {editing ? (
               <Stack gap="md">
-                <TextInput label="Name" description="We call this name at the counter." value={details.name} onChange={update('name')} autoComplete="name" status={fieldStatus('name')} statusVariant="detached" isRequired />
-                <TextInput label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" description="A Malaysian mobile number, for example 012-345 6789." value={details.phone} onChange={update('phone')} status={fieldStatus('phone')} statusVariant="detached" isRequired />
+                <TextInput label="Name" description={delivering ? 'The rider asks for this name at your door.' : 'We call this name at the counter.'} value={details.name} onChange={update('name')} autoComplete="name" status={fieldStatus('name')} statusVariant="detached" isRequired />
+                <TextInput label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" description={delivering ? 'The rider calls this number if they can’t find you. A Malaysian mobile, like 012-345 6789.' : 'A Malaysian mobile number, for example 012-345 6789.'} value={details.phone} onChange={update('phone')} status={fieldStatus('phone')} statusVariant="detached" isRequired />
                 <TextInput label="Email" type="email" inputMode="email" autoComplete="email" hasAutoCorrect={false} description="We email your receipt, and again when your order is ready." value={details.email} onChange={update('email')} status={fieldStatus('email')} statusVariant="detached" isRequired />
               </Stack>
             ) : (
@@ -414,11 +539,20 @@ export function Checkout() {
             {loadError?.canRetry ? (
               <Cta onClick={retry}>Try again</Cta>
             ) : (
-              <Cta type="submit" busy={placing} isDisabled={!pricedNow || slots.length === 0 || loadError !== null} value={!placing && options && pricedNow ? formatRM(options.cart.totalSen) : undefined}>
-                {placing ? 'Opening payment…' : options && !pricedNow && loadError === null ? 'Updating total…' : 'Pay'}
+              <Cta
+                type="submit"
+                busy={placing}
+                isDisabled={!pricedNow || slots.length === 0 || loadError !== null || (delivering && quote.kind === 'quoting')}
+                value={!placing && options && pricedNow && (!delivering || quote.kind === 'quoted') ? formatRM(options.cart.totalSen + feeSen) : undefined}
+              >
+                {placing ? 'Opening payment…' : options && !pricedNow && loadError === null ? 'Updating total…' : delivering && quote.kind === 'quoting' ? 'Pricing delivery…' : 'Pay'}
               </Cta>
             )}
-            {activeSlot ? <Type role="caption" ink="secondary">Pick-up {midSentence(activeSlot.day)}, {activeSlot.time}</Type> : null}
+            {activeSlot ? (
+              <Type role="caption" ink="secondary">
+                {delivering ? `Delivery ${midSentence(activeSlot.day)}, ${arrival(activeSlot.at) ? `about ${arrival(activeSlot.at)}` : `leaving the shop ${activeSlot.time}`}` : `Pick-up ${midSentence(activeSlot.day)}, ${activeSlot.time}`}
+              </Type>
+            ) : null}
           </div>
         </form>
       </div>

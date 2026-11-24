@@ -1,0 +1,37 @@
+/* The delivery address at checkout and the delivery lines on the order page. Sizes come from the
+   spacing tokens; only hairlines and focus rings are written in px, as in the rest of the system. */
+
+/* Use my location, then the search under it, at full width on a phone. */
+.find { display: flex; flex-direction: column; align-items: stretch; gap: var(--cjt-space-sm); }
+.suggestion { display: flex; flex-direction: column; min-width: 0; }
+
+/* The map: its centre is the pin, so the customer moves the map, not a marker that hides under a thumb. */
+.map { position: relative; aspect-ratio: 4 / 3; max-height: 50svh; border: 1px solid var(--cjt-color-ink); background: var(--cjt-color-cream-100); }
+.map[data-map='none'] { aspect-ratio: auto; }
+.mapCanvas { position: absolute; inset: 0; }
+.map[data-map='none'] .mapCanvas { display: none; }
+.noMap { display: block; padding: var(--cjt-space-sm); }
+@media (min-width: 37.5em) {
+  .map { aspect-ratio: 16 / 10; }
+}
+
+/* The pin: a cobalt square on an ink stem whose foot is the map's centre. */
+.pin {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  width: var(--cjt-space-sm);
+  height: calc(var(--cjt-space-sm) + var(--cjt-space-sm));
+  translate: -50% 0;
+  pointer-events: none;
+  background: linear-gradient(var(--cjt-color-ink), var(--cjt-color-ink)) center bottom / 2px var(--cjt-space-sm) no-repeat;
+}
+.pin::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--cjt-space-sm); background: var(--cjt-color-blue); }
+
+/* A chosen address, folded: what the rider gets and what it costs, with Change. */
+.chosen { display: flex; flex-direction: column; gap: calc(var(--cjt-space-xs) / 2); padding: var(--cjt-space-sm); }
+.chosen * { overflow-wrap: anywhere; }
+
+/* The delivery row in the bag, above the total. */
+.feeRow { display: flex; justify-content: space-between; align-items: baseline; gap: var(--cjt-space-sm); padding-top: var(--cjt-space-sm); }
+.money { font-variant-numeric: tabular-nums; }

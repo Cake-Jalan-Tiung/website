@@ -1,10 +1,15 @@
-// The two emails a customer gets about an order, and when each is due. A receipt once it is
-// paid, then a note once it is ready, which brings them back to the order's page to say
-// "I'm here". Pure: the sender, the claims and the retries live in notify.server.ts.
+// The emails a customer gets about an order, and when each is due. A receipt once it is paid.
+// Then, for pick-up, a note once it is ready, which brings them back to the order's page to say
+// "I'm here"; for a delivery, a note once the rider has it, which points to the order page and its map link on that
+// page. Pure: the sender, the claims and the retries live in notify.server.ts.
 import {color, space, tracking, typeScale, weight, type TypeRole} from '../system/tokens';
 import {formatShopDateTime} from '../storefront/hours';
 import type {Storefront} from '../storefront/model';
+import {DELIVERY_COPY, arrivesAt, formatDistance, type DeliveryState} from '../delivery/model';
 import {SOLD_STATUSES, customerCopy, formatRM, orderCode, type OrderStatus, type PricedLine} from './model';
+
+/** Where a delivery goes, on its street address alone (never the unit or the rider's note), and what the ride cost. */
+export type EmailDelivery = {address: string; feeSen: number; distanceM: number; state: DeliveryState; shareLink: string | null};
 
 /** What an email needs to know about its order. */
 export type EmailOrder = {
@@ -14,22 +19,30 @@ export type EmailOrder = {
   paidAt: string | null;
   customer: {name: string; note: string};
   items: readonly PricedLine[];
+  /** Food and ride together: what was charged. */
   totalSen: number;
   arrivedAt: string | null;
+  /** Null for an order collected at the counter. */
+  delivery: EmailDelivery | null;
 };
+
+/** When a delivery should reach the door: its collection time plus the ride. A deploy without a ride estimate says the collection time. */
+export const deliveryArrival = (store: Storefront, pickupAt: string, delivery: EmailDelivery) =>
+  store.deliveryArea ? arrivesAt(store.deliveryArea, pickupAt, delivery.distanceM) : pickupAt;
 
 export type Attachment = {filename: string; type: string; content: Uint8Array};
 export type OrderEmail = {subject: string; text: string; html: string; attachments?: readonly Attachment[]};
 
 type Page = {
-  subject: (code: string, pickup: string) => string;
+  /** `when` is the pick-up time or the arrival, as "pick-up Fri 27 Nov, 2:15pm"; null when the email gives no time. */
+  subject: (code: string, when: string | null) => string;
   heading: string;
   lead: (firstName: string) => string;
   action: string;
-  after: string;
-  /** Whether to list what was bought: the receipt does, the ready note only names the code. */
+  after: (order: EmailOrder) => string;
+  /** Whether to list what was bought, and when a delivery should arrive: the receipt does, the later notes only name the code. */
   receipt: boolean;
-  /** The ready note's singing Burung Tiung, beside its heading. */
+  /** The singing Burung Tiung beside the heading, on the notes that say the order is coming. */
   bird: boolean;
 };
 
@@ -41,24 +54,37 @@ export const ORDER_EMAILS = {
   paid: {
     isDue: (order: EmailOrder) => SOLD_STATUSES.some((status) => status === order.status),
     page: {
-      subject: (code, pickup) => `Receipt for order ${code} · pick-up ${pickup}`,
+      subject: (code, when) => `Receipt for order ${code}${when ? ` · ${when}` : ''}`,
       heading: customerCopy('paid').title,
       lead: (firstName) => `Thank you, ${firstName}. The kitchen has it.`,
       action: 'Follow your order',
-      after: 'We’ll email you again when it’s ready.',
+      after: (order) => (order.delivery ? 'We’ll email you again when it’s on the way.' : 'We’ll email you again when it’s ready.'),
       receipt: true,
       bird: false,
     },
   },
   ready: {
-    // Someone already at the counter needs no email to come to it.
-    isDue: (order: EmailOrder) => order.status === 'ready' && order.arrivedAt === null,
+    // A delivery's customer never comes to the counter, and someone already at it needs no email to come.
+    isDue: (order: EmailOrder) => order.delivery === null && order.status === 'ready' && order.arrivedAt === null,
     page: {
       subject: (code) => `Order ${code} is ready to collect`,
       heading: customerCopy('ready').title,
       lead: (firstName) => `${firstName}, it’s waiting for you at the counter.`,
       action: 'Open your order',
-      after: 'When you arrive, tap I’m here on your order page or show this code.',
+      after: () => 'When you arrive, tap I’m here on your order page or show this code.',
+      receipt: false,
+      bird: true,
+    },
+  },
+  on_the_way: {
+    // While the rider has it: a ride over before the 5-minute job looks needs no email.
+    isDue: (order: EmailOrder) => order.delivery?.state === 'on_the_way',
+    page: {
+      subject: (code) => `Order ${code} is on the way`,
+      heading: DELIVERY_COPY.onTheWay.title,
+      lead: (firstName) => `${firstName}, your rider has collected it from the shop.`,
+      action: 'Follow your rider',
+      after: () => 'Your order page follows it to your door, with a link to the rider’s live map.',
       receipt: false,
       bird: true,
     },
@@ -135,13 +161,21 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
   const pickup = formatShopDateTime(store.timeZone, order.pickupAt);
   const firstName = order.customer.name.trim().split(/\s+/)[0] || 'there';
   const link = `${origin}/order/${order.id}`;
-  const lines = order.items.map((line) => ({label: `${line.quantity} × ${line.name}`, amount: formatRM(line.unitSen * line.quantity)}));
+  const lines = [
+    ...order.items.map((line) => ({label: `${line.quantity} × ${line.name}`, amount: formatRM(line.unitSen * line.quantity)})),
+    // The ride is charged with the food but is no dish: a row of its own, so the rows still make the total.
+    ...(order.delivery ? [{label: `Delivery · ${formatDistance(order.delivery.distanceM)}`, amount: formatRM(order.delivery.feeSen)}] : []),
+  ];
   const plainRM = (value: string) => value.replace(' ', ' ');
   // On the receipt only: the note is what a cake order most needs checked (the words on the cake),
   // and the paid time is what an expense claim asks for.
   const note = page.receipt ? order.customer.note.trim() : '';
   const paid = page.receipt && order.paidAt ? `Paid ${formatShopDateTime(store.timeZone, order.paidAt)}${receiptAttached ? ' · PDF attached' : ''}` : '';
   const address = store.address.join(', ');
+  // A delivery's arrival is an estimate from its collection time, so only the receipt gives it:
+  // once the rider has the order, the live map on its page knows better.
+  const arrival = order.delivery && page.receipt ? formatShopDateTime(store.timeZone, deliveryArrival(store, order.pickupAt, order.delivery)) : null;
+  const when = order.delivery ? arrival && `arrives about ${arrival}` : `pick-up ${pickup}`;
 
   const text = [
     `${store.name}`,
@@ -151,16 +185,16 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
     '',
     `Order code: ${code}`,
     '',
-    `Pick-up: ${pickup}`,
-    address,
-    `Map: ${store.mapHref}`,
+    ...(order.delivery
+      ? [...(arrival ? [`Arrives about ${arrival}`] : []), `Delivery to ${order.delivery.address}`]
+      : [`Pick-up: ${pickup}`, address, `Map: ${store.mapHref}`]),
     ...(page.receipt ? ['', 'Your order', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total  ${plainRM(formatRM(order.totalSen))}`] : []),
     ...(paid ? [paid] : []),
     ...(note ? ['', `Your note: ${note}`] : []),
     '',
     `${page.action}: ${link}`,
     '',
-    page.after,
+    page.after(order),
     `Questions? Call ${store.phone.display}.`,
     '',
     store.signOff,
@@ -215,7 +249,7 @@ ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
 </style>
 </head>
 <body style="margin: 0; padding: 0; background: ${color['cream-100']}; -webkit-text-size-adjust: 100%;">
-<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escape(page.lead(firstName))} Order ${code}, pick-up ${escape(pickup)}.</div>
+<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escape(page.lead(firstName))} Order ${code}${when ? `, ${escape(when)}` : ''}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: ${color['cream-100']};">
 <tr><td class="frame" align="center" style="padding: ${space.lg}px ${space.sm}px;">
 <table role="presentation" width="${CARD}" cellpadding="0" cellspacing="0" style="width: 100%; max-width: ${CARD}px; background: ${color.paper}; font-family: ${FONTS.sans}; ${type('body')}">
@@ -230,12 +264,17 @@ ${hero}
 
 <tr><td style="height: ${space.lg}px; line-height: ${space.lg}px; font-size: 0;">&nbsp;</td></tr>
 
-${section(
-  'Pick-up',
-  `<p style="margin: 0 0 ${space.xs}px; ${type('subhead', color.ink, 'mono')}">${escape(pickup)}</p>
+${order.delivery
+  ? section(
+      arrival ? 'Arrives about' : 'Delivery',
+      `${arrival ? `<p style="margin: 0 0 ${space.xs}px; ${type('subhead', color.ink, 'mono')}">${escape(arrival)}</p>\n` : ''}<p style="margin: 0; ${type('body')}">To ${escape(order.delivery.address)}</p>`,
+    )
+  : section(
+      'Pick-up',
+      `<p style="margin: 0 0 ${space.xs}px; ${type('subhead', color.ink, 'mono')}">${escape(pickup)}</p>
 <p style="margin: 0 0 ${space.xs}px; ${type('body')}">${escape(address)}</p>
 <p style="margin: 0; ${type('body')}"><a href="${escape(store.mapHref)}" style="color: ${color.blue}; text-decoration: none;">Open in Google Maps ↗</a></p>`,
-)}
+    )}
 
 ${receipt}
 
@@ -243,7 +282,7 @@ ${receipt}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background: ${color.blue};">
 <a href="${escape(link)}" style="display: block; padding: ${space.sm}px; ${type('body', color.paper)} font-weight: ${weight.medium}; text-decoration: none; text-align: center;">${escape(page.action)}</a>
 </td></tr></table>
-<p style="margin: ${space.sm}px 0 0; ${type('body')}">${escape(page.after)}</p>
+<p style="margin: ${space.sm}px 0 0; ${type('body')}">${escape(page.after(order))}</p>
 <p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Questions? Call <a href="${escape(store.phone.href)}" style="color: ${color.blue}; text-decoration: none;">${escape(store.phone.display)}</a>.</p>
 </td></tr>
 
@@ -263,5 +302,5 @@ ${store.legalName ? `<p style="margin: 0; ${type('caption', color.muted)}">${esc
 </body>
 </html>`;
 
-  return {subject: page.subject(code, pickup), text, html};
+  return {subject: page.subject(code, when), text, html};
 }

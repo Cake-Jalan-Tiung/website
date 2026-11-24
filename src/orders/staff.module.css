@@ -1,0 +1,7 @@
+/* What a delivery adds to a kitchen ticket. The ticket itself is in orders.module.css. */
+
+/* An ink bar across the top of a delivery ticket, so it reads as one from across the kitchen. */
+.deliveryBar { display: flex; justify-content: space-between; align-items: baseline; gap: var(--cjt-space-sm); padding: var(--cjt-space-xs) var(--cjt-space-sm); }
+.medium { font-weight: var(--cjt-weight-medium); }
+/* An address or a rider note runs to 200 characters in a column a third of the screen wide. */
+.wraps { overflow-wrap: anywhere; }

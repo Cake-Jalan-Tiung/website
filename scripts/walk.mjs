@@ -1,6 +1,7 @@
 // Walks the customer's path on a phone, home to paid, saving a screenshot of every screen and
 // checking each for spills at 390 and 320 wide. Exits non-zero on a spill or a console error.
-// With WALK_STAFF_PIN set it also signs in to /staff and moves the paid order to Ready.
+// With WALK_STAFF_PIN set it also signs in to /staff and moves the paid order to Ready, and, on a
+// build that delivers, books a rider and follows the stand-in ride to Delivered.
 //
 //   WALK_URL=http://localhost:5179 node scripts/walk.mjs <out-dir>
 //   WALK_BROWSER=webkit ...   the same walk in Safari's engine (once: pnpm exec playwright-core install webkit)
@@ -22,8 +23,8 @@ const errors = [];
 const spills = [];
 const failed = [];
 const expect = (ok, what) => ok || failed.push(what);
-page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', (m) => m.type() === 'error' && errors.push(`${new URL(page.url()).pathname}: ${m.text()}`));
+page.on('pageerror', (e) => errors.push(`${new URL(page.url()).pathname}: ${String(e)}`));
 
 let n = 0;
 async function screen(name, {full = false} = {}) {
@@ -204,7 +205,7 @@ if (process.env.WALK_STAFF_PIN) {
   await page.getByRole('button', {name: 'I’m here'}).click();
   await page.waitForTimeout(800);
   expect((await page.getByRole('status').filter({hasText: 'The counter knows you’re here'}).count()) === 1, 'I’m here is acknowledged in a status');
-  expect(await page.getByRole('status').evaluate((el) => el === document.activeElement), 'focus moves to the acknowledgement');
+  expect(await page.getByRole('status').filter({hasText: 'The counter knows you’re here'}).evaluate((el) => el === document.activeElement), 'focus moves to the acknowledgement');
   await screen('order-arrived');
   expect(await ticket.getByText(/^Customer is here · since /).waitFor({timeout: 8000}).then(() => true, () => false), 'the kitchen sees the customer has arrived');
   await staff.screenshot({path: `${out}/staff-arrived.png`});
@@ -253,6 +254,58 @@ await page.waitForTimeout(400);
 await page.reload({waitUntil: 'networkidle'});
 await page.waitForTimeout(1500);
 expect((await lastOrder.count()) === 0, 'a closed last-order card stays away for the visit');
+
+// Delivery, on a build that offers it (DELIVERY=fake in `vite dev`): find the address, see it
+// refused when too far, price it, pay, and follow the stand-in rider to the door.
+await page.evaluate(() => localStorage.setItem('cjt.bag.v1', JSON.stringify([{dishId: 'shio-pan', quantity: 2}])));
+await page.goto(`${base}/checkout`, {waitUntil: 'networkidle'});
+await settle();
+if (await page.getByRole('radio', {name: 'Delivery'}).count()) {
+  await page.getByRole('radio', {name: 'Delivery'}).check();
+  const search = page.getByRole('combobox', {name: /search for your address/i});
+  await search.fill('test');
+  await page.getByRole('option', {name: /Test address C/}).click();
+  await page.getByLabel(/House, unit or floor/).fill('No. 12');
+  await page.getByRole('button', {name: 'Deliver here'}).click();
+  expect(await page.getByText(/^We deliver up to \d+ km/).waitFor({timeout: 8000}).then(() => true, () => false), 'an address past the area is refused before paying');
+  await page.getByRole('button', {name: 'Change'}).click();
+  await search.fill('test');
+  await page.getByRole('option', {name: /Test address B/}).click();
+  await page.getByRole('button', {name: 'Deliver here'}).click();
+  expect(await page.getByText(/^Delivery · /).first().waitFor({timeout: 8000}).then(() => true, () => false), 'the delivery fee joins the bag');
+  expect(/RM/.test((await page.getByRole('button', {name: /^Pay/}).textContent()) ?? ''), 'Pay carries the total with delivery');
+  await screen('checkout-delivery', {full: true});
+  await page.getByRole('button', {name: /^Pay/}).click();
+  await page.waitForURL(/\/pay\/test\//, {timeout: 30000});
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', {name: 'Pay', exact: true}).click();
+  await page.waitForURL(/\/order\//, {timeout: 30000});
+  const deliveryUrl = page.url();
+  await settle();
+  expect((await page.getByRole('heading', {name: 'Delivery'}).count()) === 1, 'the order page says where it is going');
+  expect((await page.getByRole('button', {name: 'I’m here'}).count()) === 0, 'a delivery has no I’m here');
+  await screen('order-delivery');
+  if (process.env.WALK_STAFF_PIN) {
+    const code = deliveryUrl.split('/order/')[1].slice(0, 6).toUpperCase();
+    const staff = await context.newPage();
+    await staff.goto(`${base}/staff`, {waitUntil: 'networkidle'});
+    const ticket = staff.getByRole('article', {name: new RegExp(`^Delivery ${code} `)});
+    await ticket.getByRole('button', {name: 'Accept'}).click();
+    await staff.waitForTimeout(800);
+    // In opening hours a delivery due soon is booked at payment; otherwise the kitchen books it early.
+    if (await ticket.getByRole('button', {name: 'Book rider now'}).count()) await ticket.getByRole('button', {name: 'Book rider now'}).click();
+    expect(await ticket.getByText('Finding a rider').waitFor({timeout: 8000}).then(() => true, () => false), 'the rider is booked, at payment or by the kitchen');
+    await staff.close();
+    for (const [button, heading] of [['Rider found', 'Rider on the way'], ['Picked up', 'On the way'], ['Delivered', 'Delivered']]) {
+      await page.goto(deliveryUrl.replace('/order/', '/deliver/test/'), {waitUntil: 'networkidle'});
+      await page.getByRole('button', {name: button}).click();
+      await page.waitForURL(/\/order\//);
+      expect(await page.getByRole('heading', {level: 1, name: heading}).waitFor({timeout: 8000}).then(() => true, () => false), `${button}: the order page says ${heading}`);
+    }
+    await settle();
+    await screen('order-delivered');
+  }
+}
 
 await browser.close();
 console.log(orderUrl);

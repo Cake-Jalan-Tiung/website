@@ -20,6 +20,7 @@ import {StoreLink} from './link';
 import {LastOrder} from './again';
 import {PickupPromise} from './promise';
 import {count as counted} from '../lib/format';
+import {useDelivers} from './delivers';
 import s from './storefront.module.css';
 
 /**
@@ -131,16 +132,17 @@ export function Media({id, cover, alt, ratio, sizes, eager = false, drawing}: {
   );
 }
 
-const ORDER_LABEL = 'Order for pick-up';
+const orderLabel = (delivers: boolean) => (delivers ? 'Order now' : 'Order for pick-up');
 
-/** "Order for pick-up", or, while staff have paused online orders, "See the menu": the same way in, without promising an order. */
+/** "Order for pick-up" ("Order now" where the site delivers too), or, while staff have paused online orders, "See the menu": the same way in, without promising an order. */
 function useOrderLabel() {
-  return useAvailability().ordersPaused ? 'See the menu' : ORDER_LABEL;
+  const delivers = useDelivers();
+  return useAvailability().ordersPaused ? 'See the menu' : orderLabel(delivers);
 }
 const HERO_ACTION = 'hero-order';
 
 /** The foot bar's stand-in for the hero's button, once that has scrolled away. */
-export const heroIdle = (store: Storefront) => ({action: {label: ORDER_LABEL, href: store.menu.href}, standsIn: HERO_ACTION});
+export const heroIdle = (store: Storefront, delivers: boolean) => ({action: {label: orderLabel(delivers), href: store.menu.href}, standsIn: HERO_ACTION});
 
 /**
  * The first screen: a picture the shop composes (`visual`), its drawings, or its hero photo, first
@@ -485,6 +487,7 @@ function WeekHours({week, timeZone}: {week: Storefront['week']; timeZone: string
 /** Hours by day, address, phone and map, the two ways to order, beside the shop photo. */
 export function Visit({store, id, art}: {store: Storefront; id: string; art: Drawing}) {
   const orderLabel = useOrderLabel();
+  const delivers = useDelivers();
   return (
     <Band as="section" ground="cream-400" aria-labelledby={id}>
       <Columns count={2} align="center" gap="xl">
@@ -502,7 +505,7 @@ export function Visit({store, id, art}: {store: Storefront; id: string; art: Dra
               </Link>
             </Row>
           </Stack>
-          <Actions primary={{label: orderLabel, href: store.menu.href}} secondary={store.delivery} />
+          <Actions primary={{label: orderLabel, href: store.menu.href}} secondary={delivers ? undefined : store.delivery} />
         </Stack>
         <Media id="shop" alt={`${store.name} shopfront`} ratio="4 / 3" sizes="(max-width: 899px) 100vw, 50vw" drawing={art} />
       </Columns>
@@ -529,6 +532,7 @@ function FooterColumn({title, children}: {title: string; children: ReactNode}) {
 
 /** The sign-off, then the menu, ordering and the shop, then the legal line. */
 export function StoreFooter({store}: {store: Storefront}) {
+  const delivers = useDelivers();
   return (
     <Band as="footer" ground="ink">
       <Stack gap="xl">
@@ -547,7 +551,7 @@ export function StoreFooter({store}: {store: Storefront}) {
             ))}
           </FooterColumn>
           <FooterColumn title="Order">
-            {[{label: 'Order for pick-up', href: store.menu.href}, store.delivery].filter((action) => action !== undefined).map((action) => (
+            {(delivers ? [{label: 'Order for pick-up or delivery', href: store.menu.href}] : [{label: 'Order for pick-up', href: store.menu.href}, store.delivery]).filter((action) => action !== undefined).map((action) => (
               <FooterLink key={action.href} href={action.href}>
                 {action.label}
               </FooterLink>

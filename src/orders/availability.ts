@@ -8,29 +8,33 @@ import {CartError, TEST_DISH, orderableDish, type CartLine} from './model';
 
 /** `until` is when it opens again by itself; null means only staff open it. */
 export type Closure = {until: string | null};
-export type Availability = {ordersPaused: Closure | null; soldOut: Record<string, Closure>};
+/** `delivers` is whether this deploy has a courier at all; `deliveryPaused` is staff stopping delivery while pick-up goes on. */
+export type Availability = {ordersPaused: Closure | null; deliveryPaused: Closure | null; soldOut: Record<string, Closure>; delivers: boolean};
 
-export const OPEN: Availability = {ordersPaused: null, soldOut: {}};
+export const OPEN: Availability = {ordersPaused: null, deliveryPaused: null, soldOut: {}, delivers: false};
 
 /** How long staff close something for. */
 export type CloseFor = 'today' | 'until-reopened';
 export const parseCloseFor = (text: string): CloseFor | null => (text === 'today' || text === 'until-reopened' ? text : null);
 
-/** A closure row as stored: `orders`, or `dish:<id>`. */
+/** A closure row as stored: `orders`, `delivery`, or `dish:<id>`. */
 export type ClosureRow = {subject: string; until: string | null};
 export const ORDERS_SUBJECT = 'orders';
+export const DELIVERY_SUBJECT = 'delivery';
 export const dishSubject = (dishId: string) => `dish:${dishId}`;
 
 /** The rows still in force at `now`, as the site reads them. */
-export function availabilityFrom(rows: readonly ClosureRow[], now: Date): Availability {
+export function availabilityFrom(rows: readonly ClosureRow[], now: Date, delivers = false): Availability {
   const live = rows.filter((row) => row.until === null || Date.parse(row.until) > now.getTime());
   const soldOut: Record<string, Closure> = {};
   let ordersPaused: Closure | null = null;
+  let deliveryPaused: Closure | null = null;
   for (const row of live) {
     if (row.subject === ORDERS_SUBJECT) ordersPaused = {until: row.until};
+    else if (row.subject === DELIVERY_SUBJECT) deliveryPaused = {until: row.until};
     else if (row.subject.startsWith('dish:')) soldOut[row.subject.slice('dish:'.length)] = {until: row.until};
   }
-  return {ordersPaused, soldOut};
+  return {ordersPaused, deliveryPaused, soldOut, delivers};
 }
 
 /** When a closure made at `now` for `closeFor` ends: the start of the shop's next day, or never. */

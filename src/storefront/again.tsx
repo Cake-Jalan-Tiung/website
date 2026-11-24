@@ -10,7 +10,8 @@ import {bag} from '../orders/bag';
 import {settlePaying} from '../orders/settle';
 import {useAvailability} from '../orders/availability-store';
 import {getOrder, type PublicOrder} from '../orders/functions';
-import {CUSTOMER_STEPS, customerCopy, formatRM, isFinished, orderableDish} from '../orders/model';
+import {formatRM, orderableDish} from '../orders/model';
+import {isUnderway, journey} from '../orders/journey';
 import {orderAgainLines, useRecentOrder, type RecentOrder} from '../orders/recent';
 import {Label} from '../system/components';
 import {Field} from '../system/Field';
@@ -24,8 +25,7 @@ import s from './storefront.module.css';
 /** After its pick-up time by this much, an order is done whatever the board says: nobody tracks yesterday's cake. */
 const TRACK_HOURS = 12;
 
-const isTracked = (order: PublicOrder, now: number) =>
-  !isFinished(order.status) && CUSTOMER_STEPS.some((step) => step.status === order.status) && now < Date.parse(order.pickupAt) + TRACK_HOURS * 3_600_000;
+const isTracked = (order: PublicOrder, now: number) => isUnderway(order) && now < Date.parse(order.pickupAt) + TRACK_HOURS * 3_600_000;
 
 /** How the last order stands: undefined while asking, null once there is nothing to track. */
 function useTracked(recent: RecentOrder | null) {
@@ -176,8 +176,10 @@ export function LastOrder({store}: {store: Storefront}) {
   // In the kitchen: where it is, as the order page's steps, and the way to it. It waits for the
   // answer, so it never rises empty.
   if (tracked || tracked === undefined) {
-    const reached = tracked ? CUSTOMER_STEPS.findIndex((step) => step.status === tracked.status) : -1;
-    const title = tracked ? customerCopy(tracked.status).title : '';
+    const trip = tracked ? journey(tracked) : null;
+    const reached = trip?.reached ?? -1;
+    const title = trip?.title ?? '';
+    const when = tracked?.delivery ? `Arrives ${midSentence(formatShopTime(store.timeZone, tracked.delivery.arrivesAt)).replace(', ', ', about ')}` : `Pick-up ${midSentence(formatShopTime(store.timeZone, recent.pickupAt))}`;
     return (
       <Card
         id={`${recent.id}:track`}
@@ -194,11 +196,11 @@ export function LastOrder({store}: {store: Storefront}) {
           {title}
         </Type>
         <Type role="caption" ink="secondary">
-          Pick-up {midSentence(formatShopTime(store.timeZone, recent.pickupAt))}
+          {when}
         </Type>
         <span className={s.lastCardSteps} aria-hidden>
-          {CUSTOMER_STEPS.map((step, index) => (
-            <span key={step.status} data-done={index <= reached ? '' : undefined} />
+          {(trip?.steps ?? []).map((label, index) => (
+            <span key={label} data-done={index <= reached ? '' : undefined} />
           ))}
         </span>
       </Card>

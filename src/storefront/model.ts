@@ -4,6 +4,7 @@ import type {ComponentType} from 'react';
 import type {MarkProps} from '../marks/marks.generated';
 import type {Flavour, Staged} from '../system/model';
 import type {Span} from './hours';
+import type {DeliveryArea} from '../delivery/model';
 
 /** A drawing on a ground it may legally sit on (Law 04 holds through `Staged`). */
 export type Drawing = Staged & {mark: ComponentType<MarkProps>};
@@ -44,8 +45,10 @@ export type Storefront = {
   /** The line every page ends on. */
   signOff: string;
   nav: readonly Action[];
-  /** Where to order delivery while the site only takes pick-up orders; omit once it delivers. */
+  /** Where to order delivery while a deploy only takes pick-up orders (DELIVERY unset); omit once delivery is live. */
   delivery?: Action;
+  /** How the site delivers when the deploy has a courier (src/delivery/); omit for pick-up only. */
+  deliveryArea?: DeliveryArea;
   /** The menu, which is also where an order starts. */
   menu: Action;
   /** Short facts under the hero; each must be true and checkable. */

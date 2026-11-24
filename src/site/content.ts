@@ -188,4 +188,8 @@ export const storefront: Storefront = {
   timeZone: 'Asia/Kuala_Lumpur',
   // Assumed until the shop confirms how long an order takes to be ready.
   pickup: {leadMinutes: 20, slotMinutes: 15, daysAhead: 2},
+  // Assumed until the shop decides: 10 km by straight line, by Lalamove motorcycle (its Malaysian
+  // service keys are listed by GET /v3/cities once the keys arrive), and a ride of 10 minutes to
+  // collect plus 3 minutes a kilometre. No pin yet: live delivery waits for the shop's exact door.
+  deliveryArea: {from: null, radiusKm: 10, service: 'MOTORCYCLE', minutesPerKm: 3, handoverMinutes: 10},
 };

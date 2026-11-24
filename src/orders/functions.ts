@@ -9,18 +9,28 @@ import {startOfShopDay} from '../storefront/hours';
 import {paymentProvider} from '../payments/select.server';
 import {alertLater} from '../ops/alert.server';
 import type {PaymentMethod, PaymentState} from '../payments/provider';
-import {CartError, KITCHEN_STATUSES, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, awaitsMoney, statusAfterAsking, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
+import {CartError, KITCHEN_STATUSES, TEST_DISH, kitchenNext, orderCode, orderableDish, parseCustomer, paymentDueAt, priceCart, servingWindow, awaitsMoney, statusAfterAsking, type CartLine, type OrderStatus, type PricedCart, type PricedLine} from './model';
 import {isOpenSlot, pickupSlots, type Slot} from './pickup';
 import {closuresRepo, ordersRepo, staffAttempts, type OrderRow} from './repo.server';
 import {notifyLater} from './notify.server';
-import {ORDERS_SUBJECT, assertAvailable, availabilityFrom, closureEnds, dishSubject, parseCloseFor, type Availability} from './availability';
+import {DELIVERY_SUBJECT, ORDERS_SUBJECT, assertAvailable, availabilityFrom, closureEnds, dishSubject, parseCloseFor, type Availability} from './availability';
 import {STAFF_COOKIE, STAFF_SESSION_DAYS, isStaffToken, issueStaffToken, sameSecret} from './staff-session.server';
 import {posStuckBefore, posState, posSyncOn, type PosBacklog, type PosState} from '../pos/status';
+import {deliverySetup, type Delivery} from '../delivery/select.server';
+import {readQuote, signQuote} from '../delivery/quote-token.server';
+import {dispatchDeps, dispatchLater} from '../delivery/dispatch.server';
+import {book} from '../delivery/dispatch';
+import {CourierError} from '../delivery/courier';
+import {STALE_FEE, arrivesAt, canBookByHand, formatDistance, isInArea, metresBetween, parseDropOff, parsePlace, staffLine, type DeliveryState, type Place} from '../delivery/model';
+import type {DeliveryRow} from '../delivery/repo.server';
 
 const repo = () => ordersRepo(env.DB, env.SHOP_ID);
 const closures = () => closuresRepo(env.DB, env.SHOP_ID);
-const readAvailability = async (now: Date) => availabilityFrom(await closures().all(), now);
+const delivery = () => deliverySetup(env, storefront);
+const readAvailability = async (now: Date) => availabilityFrom(await closures().all(), now, delivery() !== null);
 const provider = () => paymentProvider(env);
+/** The browser's Google Maps key, public by design (restricted to the shop's domains). */
+const mapsKey = () => textAt(env, 'GOOGLE_MAPS_KEY');
 
 /** A validator that reads one string field. */
 const field = (key: string) => (input: unknown) => textAt(input, key);
@@ -51,7 +61,25 @@ const failure = (error: unknown, during: keyof typeof FAILED): Failure => {
   return {ok: false, message: FAILED[during], canRetry: true};
 };
 
-export type CheckoutOptions = {cart: PricedCart; slots: Slot[]; methods: PaymentMethod[]; window: ReturnType<typeof servingWindow> | null};
+/** How the browser finds addresses: Google's map and search, or a stand-in list on a local build. */
+export type Maps = {provider: 'google'; key: string} | {provider: 'fake'};
+
+/**
+ * What checkout needs to offer delivery: the shop's door and the ride estimate (for arrival
+ * times), how far it goes, and the map. `paused` is staff stopping delivery for now.
+ */
+export type DeliveryOffer = {from: Place; radiusKm: number; minutesPerKm: number; handoverMinutes: number; maps: Maps; paused: boolean};
+
+export type CheckoutOptions = {cart: PricedCart; slots: Slot[]; methods: PaymentMethod[]; window: ReturnType<typeof servingWindow> | null; delivery: DeliveryOffer | null};
+
+/** Delivery as this deploy offers it, or null: a live courier also needs a map to find addresses with. */
+function deliveryOffer(setup: Delivery | null, availability: Availability): DeliveryOffer | null {
+  if (!setup) return null;
+  // A live courier is only set up with a key (select.server.ts); the stand-in may run without one.
+  const key = mapsKey();
+  const {from, radiusKm, minutesPerKm, handoverMinutes} = setup.area;
+  return {from, radiusKm, minutesPerKm, handoverMinutes, maps: key ? {provider: 'google', key} : {provider: 'fake'}, paused: availability.deliveryPaused !== null};
+}
 
 /** What the checkout can offer for this bag: its real prices, open pick-up times and ways to pay. */
 export const getCheckoutOptions = createServerFn({method: 'POST'})
@@ -59,7 +87,8 @@ export const getCheckoutOptions = createServerFn({method: 'POST'})
   .handler(async ({data: cart}): Promise<Result<CheckoutOptions>> => {
     try {
       const priced = priceCart(storefront, cart, {allowTest: await isStaff()});
-      assertAvailable(storefront, cart, await readAvailability(new Date()));
+      const availability = await readAvailability(new Date());
+      assertAvailable(storefront, cart, availability);
       const window = servingWindow(storefront, cart);
       return {
         ok: true,
@@ -67,9 +96,43 @@ export const getCheckoutOptions = createServerFn({method: 'POST'})
         slots: pickupSlots(storefront, new Date(), window?.span),
         methods: await provider().methods(priced.totalSen),
         window: window ?? null,
+        // The staff test item is a payment check, never a ride.
+        delivery: cart.some((line) => line.dishId === TEST_DISH.id) ? null : deliveryOffer(delivery(), availability),
       };
     } catch (error) {
       return failure(error, 'load');
+    }
+  });
+
+export type DeliveryQuote = {feeSen: number; distanceM: number; token: string};
+
+/**
+ * What delivery to this point costs, from the courier, with a token that holds the price until
+ * the order is placed. Refused outside the area, before the courier is asked.
+ */
+export const quoteDelivery = createServerFn({method: 'POST'})
+  .validator((input: unknown) => ({place: parsePlace(isRecord(input) ? input.place : null), address: textAt(input, 'address').trim().slice(0, 200)}))
+  .handler(async ({data}): Promise<Result<DeliveryQuote>> => {
+    const setup = delivery();
+    if (!setup || !data.place || !data.address) return {ok: false, message: 'Delivery isn’t available right now. Choose Pick-up.', canRetry: false};
+    const {area} = setup;
+    if (!isInArea(area, area.from, data.place)) {
+      return {ok: false, canRetry: false, message: `We deliver up to ${area.radiusKm} km from the shop, and this address is ${formatDistance(metresBetween(area.from, data.place))} away. Choose Pick-up, or another address.`};
+    }
+    try {
+      const quoted = await setup.courier.quote({place: area.from, address: storefront.address.join(', ')}, {place: data.place, address: data.address}, area.service);
+      return {ok: true, ...quoted, token: await signQuote(env.SESSION_SECRET, data.place, quoted, new Date())};
+    } catch (error) {
+      if (error instanceof CourierError && error.kind === 'refused') {
+        console.error(error);
+        return {ok: false, canRetry: false, message: 'Our rider service can’t reach this address. Choose Pick-up, or another address.'};
+      }
+      alertLater({
+        key: 'delivery-quote',
+        subject: 'Delivery could not be priced for a customer',
+        body: `Pricing a delivery at checkout failed: ${String(error)}\n\nCustomers can still choose pick-up. If this repeats, check Lalamove's status and the API keys.`,
+      });
+      return {ok: false, canRetry: true, message: 'Couldn’t price delivery just now. Try again, or choose Pick-up.'};
     }
   });
 
@@ -80,6 +143,8 @@ export const placeOrder = createServerFn({method: 'POST'})
     customer: isRecord(input) ? input.customer : undefined,
     pickupAt: textAt(input, 'pickupAt'),
     method: textAt(input, 'method'),
+    /** Absent for pick-up; else where to and the quote's token. */
+    delivery: isRecord(input) && isRecord(input.delivery) ? {dropOff: input.delivery.dropOff, token: textAt(input.delivery, 'token')} : null,
   }))
   .handler(async ({data}): Promise<Result<{orderId: string; redirectUrl: string}>> => {
     try {
@@ -89,18 +154,21 @@ export const placeOrder = createServerFn({method: 'POST'})
       assertAvailable(storefront, data.cart, await readAvailability(now));
       const customer = parseCustomer(data.customer);
       if (!isOpenSlot(storefront, now, data.pickupAt, servingWindow(storefront, data.cart)?.span)) {
-        throw new CartError('That pick-up time has just gone. Choose another.');
+        throw new CartError(data.delivery ? 'That delivery time has just gone. Choose another.' : 'That pick-up time has just gone. Choose another.');
       }
-      if (!(await payments.methods(cart.totalSen)).some((method) => method.id === data.method)) throw new CartError('Choose a way to pay.');
+      const ride = data.delivery ? await deliveryFor(data.delivery, data.cart, now) : undefined;
+      const lines = ride ? [...cart.lines, {dishId: 'delivery', name: 'Delivery', unitSen: ride.feeSen, quantity: 1}] : cart.lines;
+      const totalSen = cart.totalSen + (ride?.feeSen ?? 0);
+      if (!(await payments.methods(totalSen)).some((method) => method.id === data.method)) throw new CartError('Choose a way to pay.');
 
       const id = crypto.randomUUID();
       const orders = repo();
-      await orders.create({id, cart, customer, pickupAt: data.pickupAt, paymentMethod: data.method, now});
+      await orders.create({id, cart, customer, pickupAt: data.pickupAt, paymentMethod: data.method, now, delivery: ride});
       const origin = new URL(getRequest().url).origin;
       const checkout = await payments
         .createCheckout({
           orderId: id,
-          lines: cart.lines,
+          lines,
           customer,
           method: data.method,
           dueAt: paymentDueAt(now.toISOString()),
@@ -119,6 +187,21 @@ export const placeOrder = createServerFn({method: 'POST'})
     }
   });
 
+/** Checks a delivery as the order is placed: offered and not paused, inside the area, at the fee the customer was shown. */
+async function deliveryFor(input: {dropOff: unknown; token: string}, cart: CartLine[], now: Date) {
+  const setup = delivery();
+  if (!setup || cart.some((line) => line.dishId === TEST_DISH.id)) throw new CartError('Delivery isn’t available right now. Choose Pick-up.');
+  if ((await readAvailability(now)).deliveryPaused) throw new CartError('Delivery is paused for now. Choose Pick-up, or try again later.');
+  const dropOff = parseDropOff(input.dropOff, (message) => new CartError(message));
+  if (!isInArea(setup.area, setup.area.from, dropOff.place)) throw new CartError(`We deliver up to ${setup.area.radiusKm} km from the shop. Choose Pick-up, or another address.`);
+  const quoted = await readQuote(env.SESSION_SECRET, input.token, dropOff.place, now);
+  if (!quoted) throw new CartError(STALE_FEE);
+  return {dropOff, ...quoted};
+}
+
+/** Whether this deploy delivers at all: read once per visit, so pages render their delivery wording on the server. */
+export const getDelivers = createServerFn({method: 'GET'}).handler(async (): Promise<boolean> => delivery() !== null);
+
 /** What can be ordered right now: whether online ordering is paused, and which dishes are sold out. */
 export const getAvailability = createServerFn({method: 'GET'}).handler(async (): Promise<Availability> => readAvailability(new Date()));
 
@@ -128,7 +211,7 @@ export const setAvailability = createServerFn({method: 'POST'})
     const dishId = textAt(input, 'dishId');
     const closeFor = textAt(input, 'closeFor');
     return {
-      subject: dishId ? dishSubject(dishId) : ORDERS_SUBJECT,
+      subject: dishId ? dishSubject(dishId) : textAt(input, 'what') === 'delivery' ? DELIVERY_SUBJECT : ORDERS_SUBJECT,
       dishId,
       closeFor: parseCloseFor(closeFor),
     };
@@ -152,6 +235,27 @@ export type PublicOrder = {
   totalSen: number;
   /** When the customer said they were at the shop. */
   arrivedAt: string | null;
+  /** Where it is going and how the ride stands; null for pick-up. */
+  delivery: PublicDelivery | null;
+};
+
+/**
+ * A delivery as anyone with the order's link may read it: the street, not the unit or the note;
+ * the rider's name and the courier's live map, not phone numbers.
+ */
+export type PublicDelivery = {address: string; distanceM: number; feeSen: number; state: DeliveryState; arrivesAt: string; rider: string | null; trackUrl: string | null};
+
+const toPublicDelivery = (delivery: DeliveryRow, pickupAt: string): PublicDelivery => {
+  const area = storefront.deliveryArea;
+  return {
+    address: delivery.dropOff.address,
+    distanceM: delivery.distanceM,
+    feeSen: delivery.feeSen,
+    state: delivery.state,
+    arrivesAt: area ? arrivesAt(area, pickupAt, delivery.distanceM) : pickupAt,
+    rider: delivery.driver ? delivery.driver.name.split(/\s+/)[0] : null,
+    trackUrl: delivery.state === 'rider_assigned' || delivery.state === 'on_the_way' ? delivery.shareLink : null,
+  };
 };
 
 const toPublic = (order: OrderRow): PublicOrder => ({
@@ -163,6 +267,7 @@ const toPublic = (order: OrderRow): PublicOrder => ({
   items: order.items,
   totalSen: order.totalSen,
   arrivedAt: order.arrivedAt,
+  delivery: order.delivery ? toPublicDelivery(order.delivery, order.pickupAt) : null,
 });
 
 /**
@@ -190,6 +295,7 @@ export const getOrder = createServerFn({method: 'GET'})
     const to = statusAfterAsking(order.status, state, order.createdAt, now);
     if (!to || !(await orders.move(id, to, now))) return toPublic(order);
     notifyLater(id);
+    if (to === 'paid' && order.delivery) dispatchLater(id);
     return toPublic({...order, status: to});
   });
 
@@ -213,6 +319,16 @@ export const getTestPayment = createServerFn({method: 'GET'})
     if (env.PAYMENTS !== 'fake') return null;
     const order = await repo().get(id);
     return order && order.status === 'awaiting_payment' ? {id: order.id, totalSen: order.totalSen} : null;
+  });
+
+/** The booking behind the stand-in courier's test page; null unless this deploy runs DELIVERY=fake. */
+export const getTestRide = createServerFn({method: 'GET'})
+  .validator(field('id'))
+  .handler(async ({data: id}) => {
+    if (delivery()?.kind !== 'fake') return null;
+    const order = await repo().get(id);
+    const courierOrderId = order?.delivery?.courierOrderId;
+    return order && courierOrderId ? {orderId: order.id, courierOrderId} : null;
   });
 
 // Staff ------------------------------------------------------------------------------------
@@ -254,8 +370,37 @@ export const staffLogout = createServerFn({method: 'POST'}).handler(async () => 
   return {ok: true};
 });
 
+/** A delivery as the kitchen sees it: all of the address, the rider and what needs doing. */
+export type StaffDelivery = {
+  address: string;
+  unit: string;
+  note: string;
+  distanceM: number;
+  feeSen: number;
+  state: DeliveryState;
+  line: string;
+  problem: string | null;
+  rider: {name: string; phone: string; plate: string} | null;
+  trackUrl: string | null;
+  canBook: boolean;
+};
+
+const toStaffDelivery = (delivery: DeliveryRow): StaffDelivery => ({
+  address: delivery.dropOff.address,
+  unit: delivery.dropOff.unit,
+  note: delivery.dropOff.note,
+  distanceM: delivery.distanceM,
+  feeSen: delivery.feeSen,
+  state: delivery.state,
+  line: staffLine(delivery.state),
+  problem: delivery.problem,
+  rider: delivery.driver,
+  trackUrl: delivery.shareLink,
+  canBook: canBookByHand(delivery.state),
+});
+
 /** `pos` is where the sale stands in StoreHub; null on a deploy that does not send sales there. */
-export type StaffOrder = PublicOrder & {name: string; phone: string; note: string; pos: PosState | null};
+export type StaffOrder = Omit<PublicOrder, 'delivery'> & {name: string; phone: string; note: string; pos: PosState | null; delivery: StaffDelivery | null};
 /** `pos` counts what StoreHub is missing across every day, not only the board's; null when sales are not sent there. */
 export type StaffBoardData = {orders: StaffOrder[]; pos: PosBacklog | null};
 
@@ -306,6 +451,7 @@ export const getStaffBoard = createServerFn({method: 'GET'}).handler(async (): P
       phone: order.customer.phone,
       note: order.customer.note,
       pos: syncOn ? posState(order, now) : null,
+      delivery: order.delivery ? toStaffDelivery(order.delivery) : null,
     })),
     pos: backlog,
   };
@@ -321,4 +467,17 @@ export const advanceOrder = createServerFn({method: 'POST'})
     if (!next || !(await orders.move(id, next.to, new Date()))) return {ok: false, message: 'This order has already moved on.'};
     notifyLater(id);
     return {ok: true};
+  });
+
+/** Staff book a rider now: early, again after Lalamove gave up, or after the job asked for them. */
+export const bookRider = createServerFn({method: 'POST'})
+  .validator(field('id'))
+  .handler(async ({data: id}): Promise<Result<{state: DeliveryState}>> => {
+    if (!(await isStaff())) return {ok: false, message: 'Signed out. Enter the PIN again.'};
+    const deps = dispatchDeps(env, new Date());
+    if (!deps) return {ok: false, message: 'This site has no rider service set up.'};
+    const state = await book(id, deps, {byHand: true});
+    if (state === null) return {ok: false, message: 'This order has a rider already, or is no longer one to deliver.'};
+    if (state === 'stuck') return {ok: false, message: 'No rider booked. The reason is on the ticket.'};
+    return {ok: true, state};
   });

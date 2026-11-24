@@ -128,6 +128,7 @@ Found a vulnerability? Report it privately, as [SECURITY.md](SECURITY.md) descri
 ## Docs
 
 - [Checkout plan](docs/checkout-plan.md): decisions, the order model, CHIP and StoreHub findings, production state
+- [Delivery plan](docs/delivery-plan.md): delivery through Lalamove and Google Maps, what is checked, and the steps to go live
 - [Design system](docs/design-system.md): how the brand is built in code, and why
 
 ---

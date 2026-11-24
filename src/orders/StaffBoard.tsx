@@ -3,20 +3,24 @@
 import {useEffect, useRef, useState} from 'react';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Button} from '@astryxdesign/core/Button';
+import {Link} from '@astryxdesign/core/Link';
 import {Switch} from '@astryxdesign/core/Switch';
 import {TextInput} from '@astryxdesign/core/TextInput';
+import {formatDistance} from '../delivery/model';
 import {storefront} from '../site/content';
+import {Field} from '../system/Field';
 import {Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {formatMinutes, formatShopTime, shopClock} from '../storefront/hours';
 import {Sections} from '../storefront/sections';
-import {advanceOrder, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffBoardData, type StaffOrder} from './functions';
+import {advanceOrder, bookRider, getStaffBoard, setAvailability, staffLogin, staffLogout, type StaffBoardData, type StaffDelivery, type StaffOrder} from './functions';
 import type {PosBacklog, PosState} from '../pos/status';
 import {showAvailability, useAvailability} from './availability-store';
-import type {CloseFor} from './availability';
+import type {CloseFor, Closure} from './availability';
 import {KITCHEN_COLUMNS, TEST_DISH, kitchenNext, formatRM} from './model';
 import {bag} from './bag';
 import s from './orders.module.css';
+import st from './staff.module.css';
 
 const POLL_MS = 5000;
 /** Within this many minutes a ticket counts down; further out it shows the time. */
@@ -82,12 +86,81 @@ function minutesUntil(iso: string, now: number) {
   return Math.round((Date.parse(iso) - now) / 60_000);
 }
 
+/** Books a rider now. Keyed by the delivery's state, so a failure's message goes once the state moves on. */
+function BookRider({orderId, onMoved}: {orderId: string; onMoved: () => void}) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <Row>
+        <Button
+          variant="secondary"
+          label="Book rider now"
+          clickAction={async () => {
+            const result = await bookRider({data: {id: orderId}});
+            setError(result.ok ? null : result.message);
+            onMoved();
+          }}
+        />
+      </Row>
+      {error ? <Banner status="error" title={error} /> : null}
+    </>
+  );
+}
+
+/** What a delivery ticket adds: the door it goes to, and where its rider stands. */
+function DeliveryDetails({orderId, delivery, onMoved}: {orderId: string; delivery: StaffDelivery; onMoved: () => void}) {
+  const {rider} = delivery;
+  return (
+    <>
+      <Stack as="address" gap="none">
+        <Type role="body" className={st.wraps}>{[delivery.unit, delivery.address].filter(Boolean).join(', ')}</Type>
+        {delivery.note ? <Type role="body" ink="secondary" className={st.wraps}>Rider note: {delivery.note}</Type> : null}
+      </Stack>
+      <Stack gap="xs">
+        {delivery.problem ? (
+          <Banner status="warning" title={delivery.line} description={delivery.problem} />
+        ) : (
+          <Type role="body">
+            <strong className={st.medium}>{delivery.line}</strong>
+          </Type>
+        )}
+        {rider ? (
+          <Row gap="xs" align="baseline">
+            <Type role="body">{[rider.name, rider.plate].filter(Boolean).join(' · ')}</Type>
+            {rider.phone ? <Link href={`tel:${rider.phone}`}>{rider.phone}</Link> : null}
+          </Row>
+        ) : null}
+        {delivery.trackUrl ? (
+          <Link href={delivery.trackUrl} isExternalLink>
+            Open Lalamove map
+          </Link>
+        ) : null}
+        {delivery.canBook ? <BookRider key={delivery.state} orderId={orderId} onMoved={onMoved} /> : null}
+      </Stack>
+    </>
+  );
+}
+
 function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onMoved: () => void}) {
   const [error, setError] = useState<string | null>(null);
   const next = kitchenNext(order.status);
   const minutes = minutesUntil(order.pickupAt, Date.now());
+  const {delivery} = order;
   return (
-    <article className={s.staffTicket} data-new={isNew ? '' : undefined} data-here={order.arrivedAt ? '' : undefined} aria-label={`Order ${order.code} for ${order.name}`}>
+    <article
+      className={s.staffTicket}
+      data-new={isNew ? '' : undefined}
+      data-here={order.arrivedAt ? '' : undefined}
+      aria-label={`${delivery ? 'Delivery' : 'Order'} ${order.code} for ${order.name}`}
+    >
+      {delivery ? (
+        <Field colour="ink" as="span" className={st.deliveryBar}>
+          <Type role="body">
+            <strong className={st.medium}>Delivery</strong>
+          </Type>
+          <Type role="body">{formatDistance(delivery.distanceM)}</Type>
+        </Field>
+      ) : null}
       <span className={s.ticketHead}>
         <Type role="subhead" as="h3">
           <span className={s.code}>{order.code}</span> · {order.name}
@@ -115,6 +188,7 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
           <Type role="body">Note: {order.note}</Type>
         </span>
       ) : null}
+      {delivery ? <DeliveryDetails orderId={order.id} delivery={delivery} onMoved={onMoved} /> : null}
       <Row justify="between" align="center" gap="sm">
         <Stack gap="none">
           <a href={`tel:${order.phone}`}>
@@ -128,7 +202,7 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
           <Button
             variant={isNewStatus(order) ? 'primary' : 'secondary'}
             size="lg"
-            label={next.label}
+            label={delivery && next.to === 'collected' ? 'Handed to rider' : next.label}
             clickAction={async () => {
               const result = await advanceOrder({data: {id: order.id}});
               setError(result.ok ? null : result.message);
@@ -142,35 +216,62 @@ function Ticket({order, isNew, onMoved}: {order: StaffOrder; isNew: boolean; onM
   );
 }
 
-/** Pause online ordering, and mark dishes sold out for the rest of the day. */
+type PauseCopy = {pauseToday: string; pauseUntil: string; resume: string; pausedToday: string; pausedUntil: string; meaning: string};
+
+/** What staff can pause: all online ordering, or delivery alone while pick-up goes on. */
+const PAUSES = {
+  orders: {
+    pauseToday: 'Pause for today',
+    pauseUntil: 'Pause until I resume',
+    resume: 'Resume online orders',
+    pausedToday: 'Paused for the rest of today',
+    pausedUntil: 'Paused until you resume',
+    meaning: 'Customers can see the menu but cannot order. Orders already paid stay on the board.',
+  },
+  delivery: {
+    pauseToday: 'Pause delivery for today',
+    pauseUntil: 'Pause delivery until I resume',
+    resume: 'Resume delivery',
+    pausedToday: 'Delivery paused for the rest of today',
+    pausedUntil: 'Delivery paused until you resume',
+    meaning: 'Customers can still order for pick-up. Deliveries already paid still get their rider.',
+  },
+} as const satisfies Record<string, PauseCopy>;
+
+function Pause({copy, paused, change}: {copy: PauseCopy; paused: Closure | null; change: (closeFor: CloseFor | 'open') => Promise<void>}) {
+  return paused ? (
+    <Stack gap="sm">
+      <Banner status="warning" title={paused.until ? copy.pausedToday : copy.pausedUntil} description={copy.meaning} />
+      <Button variant="primary" label={copy.resume} clickAction={() => change('open')} />
+    </Stack>
+  ) : (
+    <Row gap="sm">
+      <Button variant="secondary" label={copy.pauseToday} clickAction={() => change('today')} />
+      <Button variant="secondary" label={copy.pauseUntil} clickAction={() => change('until-reopened')} />
+    </Row>
+  );
+}
+
+/** Pause online ordering or delivery, and mark dishes sold out for the rest of the day. */
 function Availability() {
   const availability = useAvailability();
   const [error, setError] = useState<string | null>(null);
-  const change = async (data: {dishId?: string; closeFor: CloseFor | 'open'}) => {
+  const change = async (data: {what?: 'delivery'; dishId?: string; closeFor: CloseFor | 'open'}) => {
     const result = await setAvailability({data});
     if (result.ok) showAvailability(result.availability);
     setError(result.ok ? null : result.message);
   };
-  const paused = availability.ordersPaused;
   return (
     <section className={s.column} aria-labelledby="availability">
       <Stack gap="md">
         <Type role="subhead" as="h2" id="availability">Online ordering</Type>
-        {paused ? (
-          <Stack gap="sm">
-            <Banner
-              status="warning"
-              title={paused.until ? 'Paused for the rest of today' : 'Paused until you resume'}
-              description="Customers can see the menu but cannot order. Orders already paid stay on the board."
-            />
-            <Button variant="primary" label="Resume online orders" clickAction={() => change({closeFor: 'open'})} />
-          </Stack>
-        ) : (
-          <Row gap="sm">
-            <Button variant="secondary" label="Pause for today" clickAction={() => change({closeFor: 'today'})} />
-            <Button variant="secondary" label="Pause until I resume" clickAction={() => change({closeFor: 'until-reopened'})} />
-          </Row>
-        )}
+        <Pause copy={PAUSES.orders} paused={availability.ordersPaused} change={(closeFor) => change({closeFor})} />
+        {availability.delivers ? (
+          <>
+            <Type role="subhead" as="h3">Delivery</Type>
+            <Pause copy={PAUSES.delivery} paused={availability.deliveryPaused} change={(closeFor) => change({what: 'delivery', closeFor})} />
+          </>
+        ) : null}
         <Type role="subhead" as="h3">Sold out today</Type>
         <Type role="body" ink="secondary">A dish switched on here cannot be ordered online until tomorrow.</Type>
         <Columns count={3} gap="md" align="start">

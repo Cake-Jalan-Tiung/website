@@ -1,11 +1,12 @@
 // The order emails, wired to D1 and the sending binding. Every place that moves an order to paid
-// or ready asks `notifyLater` right after; the 5-minute job's `sendDueEmails` catches whatever
-// those missed or failed. Both only ask `notifyOrder`, which decides from the order as it is.
+// or ready, or a delivery to its rider, asks `notifyOrder` right after; the 5-minute job's
+// `sendDueEmails` catches whatever those missed or failed. `notifyOrder` decides from the order as it is.
 import {env, waitUntil} from 'cloudflare:workers';
 import {storefront} from '../site/content';
 import {sendAlert} from '../ops/alert.server';
 import {SOLD_STATUSES} from './model';
 import {EMAIL_ATTEMPTS, EMAIL_CLAIM_MINUTES, notifyOrder, type NotifyDeps} from './notify';
+import type {OrderEmailKind} from './email';
 import {ordersRepo} from './repo.server';
 
 const FROM = 'orders@hello.cakejalantiung.app';
@@ -13,18 +14,24 @@ const FROM = 'orders@hello.cakejalantiung.app';
 const OWED_HOURS = 24;
 const PER_RUN = 20;
 
-type NotifyEnv = {DB: D1Database; SHOP_ID: string; ORDER_EMAIL: SendEmail; SITE_URL: string; ALERT_EMAIL: SendEmail; ALERT_TO: string};
+export type NotifyEnv = {DB: D1Database; SHOP_ID: string; ORDER_EMAIL: SendEmail; SITE_URL: string; ALERT_EMAIL: SendEmail; ALERT_TO: string};
 
 const minutesBefore = (now: Date, minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
 const placeholders = (values: readonly unknown[]) => values.map(() => '?').join(', ');
 
-function deps(target: NotifyEnv, now: Date): NotifyDeps {
+export function notifyDeps(target: NotifyEnv, now: Date): NotifyDeps {
   const db = target.DB;
   const orders = ordersRepo(db, target.SHOP_ID);
   return {
     async order(id) {
       const row = await orders.get(id);
-      return row && {...row, email: row.customer.email};
+      if (!row) return null;
+      const {delivery} = row;
+      return {
+        ...row,
+        email: row.customer.email,
+        delivery: delivery && {address: delivery.dropOff.address, feeSen: delivery.feeSen, distanceM: delivery.distanceM, state: delivery.state, shareLink: delivery.shareLink},
+      };
     },
     emails: {
       async claim(orderId, kind, at) {
@@ -64,24 +71,25 @@ function deps(target: NotifyEnv, now: Date): NotifyDeps {
  * Sends this order's due emails after the response, for code that runs inside a request. Built
  * inside the promise, so not even a misconfigured binding can throw into the request that asked.
  */
-export const notifyLater = (orderId: string) => waitUntil(Promise.resolve().then(() => notifyOrder(orderId, deps(env, new Date()))).catch((error: unknown) => console.error('Order emails not sent', error)));
+export const notifyLater = (orderId: string) => waitUntil(Promise.resolve().then(() => notifyOrder(orderId, notifyDeps(env, new Date()))).catch((error: unknown) => console.error('Order emails not sent', error)));
 
 /**
  * The 5-minute job: orders that may still be owed an email, by the same rules as `ORDER_EMAILS`
- * (paid and not refunded; ready and not yet arrived), with no email of that kind sent, skipped or
- * given up. `notifyOrder` checks each again before sending.
+ * (paid and not refunded; ready, not yet arrived and not a delivery; a delivery its rider has),
+ * with no email of that kind sent, skipped or given up. `notifyOrder` checks each again before sending.
  */
 export async function sendDueEmails(target: NotifyEnv, now: Date = new Date()) {
-  const owed = (kind: string) =>
+  const owed = (kind: OrderEmailKind) =>
     `NOT EXISTS (SELECT 1 FROM order_emails e WHERE e.order_id = o.id AND e.kind = '${kind}' AND (e.state IN ('sent', 'skipped') OR e.attempts >= ?))`;
   const rows = await target.DB.prepare(
     `SELECT o.id FROM orders o WHERE o.shop_id = ? AND o.updated_at >= ? AND (
        (o.status IN (${placeholders(SOLD_STATUSES)}) AND ${owed('paid')})
-       OR (o.status = 'ready' AND o.arrived_at IS NULL AND ${owed('ready')})
+       OR (o.status = 'ready' AND o.arrived_at IS NULL AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.order_id = o.id) AND ${owed('ready')})
+       OR (EXISTS (SELECT 1 FROM deliveries d WHERE d.order_id = o.id AND d.state = 'on_the_way') AND ${owed('on_the_way')})
      ) ORDER BY o.updated_at DESC LIMIT ?`,
   )
-    .bind(target.SHOP_ID, minutesBefore(now, OWED_HOURS * 60), ...SOLD_STATUSES, EMAIL_ATTEMPTS, EMAIL_ATTEMPTS, PER_RUN)
+    .bind(target.SHOP_ID, minutesBefore(now, OWED_HOURS * 60), ...SOLD_STATUSES, EMAIL_ATTEMPTS, EMAIL_ATTEMPTS, EMAIL_ATTEMPTS, PER_RUN)
     .all<{id: string}>();
-  const shared = deps(target, now);
+  const shared = notifyDeps(target, now);
   for (const {id} of rows.results) await notifyOrder(id, shared);
 }

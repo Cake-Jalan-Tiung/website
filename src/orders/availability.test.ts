@@ -16,7 +16,12 @@ describe('availabilityFrom', () => {
       ],
       now,
     );
-    expect(availability).toEqual({ordersPaused: {until: null}, soldOut: {croissant: {until: '2026-11-23T16:00:00Z'}}});
+    expect(availability).toEqual({ordersPaused: {until: null}, deliveryPaused: null, soldOut: {croissant: {until: '2026-11-23T16:00:00Z'}}, delivers: false});
+  });
+
+  it('reads a delivery pause apart from an orders pause, and says whether the deploy delivers', () => {
+    const availability = availabilityFrom([{subject: 'delivery', until: '2026-11-23T16:00:00Z'}], now, true);
+    expect(availability).toMatchObject({ordersPaused: null, deliveryPaused: {until: '2026-11-23T16:00:00Z'}, delivers: true});
   });
 });
 

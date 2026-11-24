@@ -2,10 +2,11 @@
 // report as the counter's. Shape from StoreHub's REST API document (v1.5, Add Transaction):
 // amounts in ringgit, tax-exclusive, and one payment method for every web sale, so the real
 // method and the pick-up time go in the comment.
-import {orderCode, type PricedLine} from '../orders/model';
+import {formatRM, orderCode, type PricedLine} from '../orders/model';
 import {formatShopDateTime} from '../storefront/hours';
 
-export type PosSale = {orderId: string; paidAt: string; pickupAt: string; paymentMethod: string; totalSen: number; items: readonly PricedLine[]};
+/** `totalSen` is the food alone; `deliverySen` is the courier's fee the customer also paid, null for pick-up. */
+export type PosSale = {orderId: string; paidAt: string; pickupAt: string; paymentMethod: string; totalSen: number; deliverySen?: number | null; items: readonly PricedLine[]};
 export type PosShop = {storeId: string; paymentMethod: string; products: Readonly<Record<string, string>>; timeZone: string};
 
 export type StorehubItem = {productId: string; quantity: number; unitPrice: number; subTotal: number; total: number; tax: number; discount: number};
@@ -54,7 +55,10 @@ export function storehubTransaction(sale: PosSale, shop: PosShop): StorehubTrans
     tax: 0,
     discount: 0,
     roundedAmount: 0,
-    comment: `Web order ${code}, paid online (${sale.paymentMethod}), pick-up ${formatShopDateTime(shop.timeZone, sale.pickupAt)}`,
+    comment:
+      sale.deliverySen === null || sale.deliverySen === undefined
+        ? `Web order ${code}, paid online (${sale.paymentMethod}), pick-up ${formatShopDateTime(shop.timeZone, sale.pickupAt)}`
+        : `Web order ${code}, paid online (${sale.paymentMethod}), delivery collected ${formatShopDateTime(shop.timeZone, sale.pickupAt)}; the customer also paid ${formatRM(sale.deliverySen)} for the ride, which is not in this sale`,
     items,
   };
 }

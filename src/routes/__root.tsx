@@ -12,6 +12,7 @@ import {Type} from '../system/Type';
 import {Sections} from '../storefront/sections';
 import {StoreLink} from '../storefront/link';
 import {refreshAvailability} from '../orders/availability-store';
+import {getDelivers} from '../orders/functions';
 import {color} from '../system/tokens';
 
 export const Route = createRootRoute({
@@ -25,6 +26,9 @@ export const Route = createRootRoute({
     // Every page sets its words in Jost: fetched with the page, so the first paint is already in it.
     links: [{rel: 'preload', href: jost, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous'}],
   }),
+  // Whether the site delivers is fixed per deploy: asked once, on the server for the first page.
+  loader: () => getDelivers(),
+  staleTime: Infinity,
   shellComponent: Shell,
   notFoundComponent: NotFound,
   component: () => (

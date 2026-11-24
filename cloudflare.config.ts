@@ -1,7 +1,7 @@
 import {bindings, defineConfig, triggers} from 'cf/config';
 import * as entrypoint from './src/server.ts' with {type: 'cf-worker'};
 
-export default defineConfig({
+export default defineConfig(({mode}) => ({
   accountId: '9c006d850453ab5c068f5688d138521b',
   worker: {
     name: 'cakejalantiung',
@@ -27,6 +27,13 @@ export default defineConfig({
       ORDER_EMAIL: bindings.sendEmail({allowedSenderAddresses: ['orders@hello.cakejalantiung.app']}),
       // Where links in those emails point; the 5-minute job has no request to read it from.
       SITE_URL: bindings.text('https://cakejalantiung.app'),
+      // Delivery (src/delivery/): `fake` in `vite dev`, the stand-in courier beside fake payments;
+      // empty in a build, so production takes pick-up orders only until it is set to `lalamove`
+      // with LALAMOVE_API_KEY and LALAMOVE_API_SECRET declared as secrets (docs/delivery-plan.md).
+      DELIVERY: bindings.text(mode === 'development' ? 'fake' : ''),
+      // The browser's Google Maps key: public by design, restricted in Google Cloud to the shop's
+      // domains. Empty: checkout finds addresses from the stand-in list, which only DELIVERY=fake uses.
+      GOOGLE_MAPS_KEY: bindings.text(''),
     },
     // The shop's own address. workers.dev stays on beside it: payments started there return
     // there, and links to it keep working.
@@ -35,4 +42,4 @@ export default defineConfig({
     // Every 5 minutes: settle orders still waiting for payment, and keep StoreHub in step (src/ops/scheduled.server.ts).
     triggers: [triggers.scheduled({schedule: '*/5 * * * *'})],
   },
-});
+}));

@@ -5,6 +5,8 @@ import type {ConfirmedEvent} from '../payments/provider';
 import type {PosSale} from '../pos/sale';
 import type {PosBacklog} from '../pos/status';
 import type {ClosureRow} from './availability';
+import {insertDelivery, toDelivery, type DeliveryRecord, type DeliveryRow} from '../delivery/repo.server';
+import type {DropOff} from '../delivery/model';
 
 export type OrderRow = {
   id: string;
@@ -20,6 +22,8 @@ export type OrderRow = {
   /** When the customer said they were at the shop; null until they have. */
   arrivedAt: string | null;
   items: PricedLine[];
+  /** Where it goes and how the ride stands; null for an order collected at the counter. */
+  delivery: DeliveryRow | null;
 };
 
 type OrderRecord = {
@@ -29,9 +33,10 @@ type OrderRecord = {
 };
 type ItemRecord = {order_id: string; dish_id: string; name: string; unit_sen: number; quantity: number};
 
-function toRow(record: OrderRecord, items: ItemRecord[]): OrderRow {
+function toRow(record: OrderRecord, items: ItemRecord[], deliveries: readonly DeliveryRecord[] = []): OrderRow {
   const status = ORDER_STATUSES.find((s) => s === record.status);
   if (!status) throw new Error(`order ${record.id} has unknown status ${record.status}`);
+  const delivery = deliveries.find((found) => found.order_id === record.id);
   return {
     id: record.id,
     status,
@@ -44,6 +49,7 @@ function toRow(record: OrderRecord, items: ItemRecord[]): OrderRow {
     posRecordedAt: record.pos_recorded_at,
     arrivedAt: record.arrived_at ?? null,
     items: items.filter((item) => item.order_id === record.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
+    delivery: delivery ? toDelivery(delivery) : null,
   };
 }
 
@@ -73,29 +79,33 @@ export function ordersRepo(db: D1Database, shopId: string) {
   return {
     move,
 
-    async create(input: {id: string; cart: PricedCart; customer: Customer; pickupAt: string; paymentMethod: string; now: Date}) {
+    /** A delivery's fee is charged with the food: `total_sen` is both, and its row holds the fee. */
+    async create(input: {id: string; cart: PricedCart; customer: Customer; pickupAt: string; paymentMethod: string; now: Date; delivery?: {dropOff: DropOff; distanceM: number; feeSen: number}}) {
       const now = input.now.toISOString();
+      const totalSen = input.cart.totalSen + (input.delivery?.feeSen ?? 0);
       await db.batch([
         db
           .prepare(
             `INSERT INTO orders (id, shop_id, status, pickup_at, customer_name, phone, email, note, total_sen, payment_method, created_at, updated_at)
              VALUES (?, ?, 'awaiting_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .bind(input.id, shopId, input.pickupAt, input.customer.name, input.customer.phone, input.customer.email, input.customer.note, input.cart.totalSen, input.paymentMethod, now, now),
+          .bind(input.id, shopId, input.pickupAt, input.customer.name, input.customer.phone, input.customer.email, input.customer.note, totalSen, input.paymentMethod, now, now),
         ...input.cart.lines.map((line) =>
           db.prepare('INSERT INTO order_items (order_id, dish_id, name, unit_sen, quantity) VALUES (?, ?, ?, ?, ?)').bind(input.id, line.dishId, line.name, line.unitSen, line.quantity),
         ),
+        ...(input.delivery ? [insertDelivery(db, input.id, input.delivery, now)] : []),
       ]);
     },
 
-    /** The customer is at the shop. Only once, only while the kitchen has the order, and only as `canArrive` allows. */
+    /** The customer is at the shop. Only once, only while the kitchen has the order, only as `canArrive` allows, and never for a delivery. */
     async arrive(id: string, now: Date): Promise<boolean> {
       // pickup_at is stored as toISOString(), so the strings compare as the instants do.
       const opensBy = new Date(now.getTime() + ARRIVAL_OPENS_MINUTES * 60_000).toISOString();
       const result = await db
         .prepare(
           `UPDATE orders SET arrived_at = ? WHERE id = ? AND shop_id = ? AND arrived_at IS NULL
-           AND status IN (${placeholders(KITCHEN_STATUSES)}) AND (status = 'ready' OR pickup_at <= ?)`,
+           AND status IN (${placeholders(KITCHEN_STATUSES)}) AND (status = 'ready' OR pickup_at <= ?)
+           AND id NOT IN (SELECT order_id FROM deliveries)`,
         )
         .bind(now.toISOString(), id, shopId, ...KITCHEN_STATUSES, opensBy)
         .run();
@@ -107,23 +117,25 @@ export function ordersRepo(db: D1Database, shopId: string) {
     },
 
     async get(id: string): Promise<OrderRow | null> {
-      // Both reads at once: the items query needs only the id.
-      const [record, items] = await Promise.all([
+      // All reads at once: the items and delivery queries need only the id.
+      const [record, items, delivery] = await Promise.all([
         db.prepare('SELECT * FROM orders WHERE id = ? AND shop_id = ?').bind(id, shopId).first<OrderRecord>(),
         db.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(id).all<ItemRecord>(),
+        db.prepare('SELECT * FROM deliveries WHERE order_id = ?').bind(id).all<DeliveryRecord>(),
       ]);
-      return record ? toRow(record, items.results) : null;
+      return record ? toRow(record, items.results, delivery.results) : null;
     },
 
     /** Orders the kitchen is working on, soonest pick-up first, plus those collected since `since`. */
     async kitchen(since: Date): Promise<OrderRow[]> {
       const where = `shop_id = ? AND (status IN (${placeholders(KITCHEN_STATUSES)}) OR (status = 'collected' AND updated_at >= ?))`;
       const binds = [shopId, ...KITCHEN_STATUSES, since.toISOString()];
-      const [orders, items] = await Promise.all([
+      const [orders, items, deliveries] = await Promise.all([
         db.prepare(`SELECT * FROM orders WHERE ${where} ORDER BY pickup_at`).bind(...binds).all<OrderRecord>(),
         db.prepare(`SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE ${where})`).bind(...binds).all<ItemRecord>(),
+        db.prepare(`SELECT * FROM deliveries WHERE order_id IN (SELECT id FROM orders WHERE ${where})`).bind(...binds).all<DeliveryRecord>(),
       ]);
-      return orders.results.map((record) => toRow(record, items.results));
+      return orders.results.map((record) => toRow(record, items.results, deliveries.results));
     },
 
     /**
@@ -172,8 +184,9 @@ export function ordersRepo(db: D1Database, shopId: string) {
       const where = `shop_id = ? AND ${UNRECORDED}`;
       const binds = [shopId, ...UNRECORDED_BINDS];
       const [orders, items] = await Promise.all([
-        db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen FROM orders WHERE ${where} ORDER BY paid_at DESC, id LIMIT ?`).bind(...binds, limit)
-          .all<{id: string; paid_at: string; pickup_at: string; payment_method: string; total_sen: number}>(),
+        // The courier's fee is not the shop's sale: the POS gets the food, at what was paid for it.
+        db.prepare(`SELECT id, paid_at, pickup_at, payment_method, total_sen, (SELECT fee_sen FROM deliveries WHERE order_id = orders.id) AS fee_sen FROM orders WHERE ${where} ORDER BY paid_at DESC, id LIMIT ?`).bind(...binds, limit)
+          .all<{id: string; paid_at: string; pickup_at: string; payment_method: string; total_sen: number; fee_sen: number | null}>(),
         db.prepare(`SELECT * FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE ${where} ORDER BY paid_at DESC, id LIMIT ?)`).bind(...binds, limit).all<ItemRecord>(),
       ]);
       return orders.results.map((order) => ({
@@ -181,7 +194,8 @@ export function ordersRepo(db: D1Database, shopId: string) {
         paidAt: order.paid_at,
         pickupAt: order.pickup_at,
         paymentMethod: order.payment_method,
-        totalSen: order.total_sen,
+        totalSen: order.total_sen - (order.fee_sen ?? 0),
+        deliverySen: order.fee_sen,
         items: items.results.filter((item) => item.order_id === order.id).map((item) => ({dishId: item.dish_id, name: item.name, unitSen: item.unit_sen, quantity: item.quantity})),
       }));
     },

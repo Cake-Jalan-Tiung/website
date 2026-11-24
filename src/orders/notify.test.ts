@@ -1,6 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {storefront} from '../site/content';
 import type {Alert} from '../ops/alert.server';
+import type {Storefront} from '../storefront/model';
+import {DELIVERY_STATES, type DeliveryState} from '../delivery/model';
 import {orderEmail, type EmailOrder, type OrderEmail} from './email';
 import {EMAIL_ATTEMPTS, notifyOrder, type NotifyDeps} from './notify';
 import type {OrderStatus} from './model';
@@ -20,9 +22,17 @@ const order = (status: OrderStatus, extra: Partial<EmailOrder> = {}): EmailOrder
   ],
   totalSen: 3050,
   arrivedAt: null,
+  delivery: null,
   email: 'aina@example.com',
   ...extra,
 });
+
+/** The ride pinned here, not read from content.ts: 10 minutes to hand over, then 3 a kilometre. */
+const store: Storefront = {...storefront, deliveryArea: {from: {lat: 3.08, lng: 101.52}, radiusKm: 10, service: 'MOTORCYCLE', minutesPerKm: 3, handoverMinutes: 10}};
+const ADDRESS = 'Lot 12 & 14, Jalan Tiung 4/1, Seksyen 4, 40000 Shah Alam';
+/** 6.24 km at RM 8: collected at 2:15pm, it should arrive 10 + ceil(6.24 × 3) = 29 minutes later, at 2:44pm. */
+const delivered = (status: OrderStatus, state: DeliveryState) =>
+  order(status, {delivery: {address: ADDRESS, feeSen: 800, distanceM: 6240, state, shareLink: null}, totalSen: 3050 + 800});
 
 /** Claims kept as the table keeps them: one row per order and kind, retried only after a failure, a few times at most. */
 function setup(current: EmailOrder & {email: string}, fail: (email: OrderEmail) => Error | null = () => null) {
@@ -121,6 +131,23 @@ describe('notifyOrder', () => {
     expect(alerts.at(-1)?.subject).toContain('given up');
   });
 
+  it('never sends a delivery the ready note, and the on-the-way note only while the rider has it', async () => {
+    for (const state of DELIVERY_STATES) {
+      const {deps, sent, rows} = setup(delivered('ready', state));
+      // The receipt went at payment; what is left to decide is the note.
+      rows.set(`${ID}:paid`, {state: 'sent', attempts: 1});
+      await notifyOrder(ID, {...deps, store});
+      expect(sent.map((s) => s.email.subject), state).toEqual(state === 'on_the_way' ? ['Order K3F9QA is on the way'] : []);
+    }
+  });
+
+  it('sends the on-the-way note once, however many times it is asked', async () => {
+    const {deps, sent} = setup(delivered('collected', 'on_the_way'));
+    await notifyOrder(ID, {...deps, store});
+    await notifyOrder(ID, {...deps, store});
+    expect(sent.map((s) => s.email.subject)).toEqual(['Receipt for order K3F9QA · arrives about Fri 27 Nov, 2:44pm', 'Order K3F9QA is on the way']);
+  }, 20000);
+
   it('never throws, even when the order cannot be read', async () => {
     const {deps} = setup(order('paid'));
     await expect(notifyOrder(ID, {...deps, order: async () => Promise.reject(new Error('D1 down'))})).resolves.toBeUndefined();
@@ -175,5 +202,44 @@ describe('orderEmail', () => {
   it('writes the pick-up date out, since an email is read later', () => {
     expect(receipt.text).toContain('Pick-up: Fri 27 Nov, 2:15pm');
     expect(receipt.text).not.toMatch(/today|tomorrow/i);
+  });
+});
+
+describe('orderEmail for a delivery', () => {
+  const receipt = orderEmail('paid', delivered('paid', 'waiting'), store, 'https://cakejalantiung.app');
+  const onTheWay = orderEmail('on_the_way', delivered('collected', 'on_the_way'), store, 'https://cakejalantiung.app');
+
+  it('gives the receipt the arrival and the street in place of the counter, and the subject only the arrival', () => {
+    expect(receipt.subject).toBe('Receipt for order K3F9QA · arrives about Fri 27 Nov, 2:44pm');
+    expect(receipt.text).toContain(`Arrives about Fri 27 Nov, 2:44pm\nDelivery to ${ADDRESS}`);
+    expect(receipt.html).toContain('Fri 27 Nov, 2:44pm');
+    expect(receipt.html).toContain('To Lot 12 &amp; 14, Jalan Tiung 4/1');
+    for (const email of [receipt.text, receipt.html]) {
+      expect(email).not.toContain('Pick-up');
+      expect(email).not.toContain(storefront.address.join(', '));
+    }
+    expect(receipt.html).not.toContain('Open in Google Maps');
+  });
+
+  it('lists the ride as its own row above a total of food and ride together', () => {
+    expect(receipt.text).toContain('1 × Latte / Cappuccino / Flat White  RM 12.50\nDelivery · 6.2 km  RM 8.00\nTotal  RM 38.50');
+    expect(receipt.html).toContain('Delivery · 6.2 km');
+    expect(receipt.html).toContain('RM\u00a038.50');
+  });
+
+  it('says the next email is the one about the rider, not the counter', () => {
+    expect(receipt.text).toContain('We’ll email you again when it’s on the way.');
+    expect(receipt.text).not.toContain('when it’s ready');
+  });
+
+  it('sends the on-the-way note to the order page and its map link, with no arrival the rider may already have missed', () => {
+    expect(onTheWay.text).toContain('On the way');
+    expect(onTheWay.text).toContain(`Follow your rider: https://cakejalantiung.app/order/${ID}`);
+    expect(onTheWay.html).toContain(`href="https://cakejalantiung.app/order/${ID}"`);
+    expect(onTheWay.text).toContain('Your order page follows it to your door, with a link to the rider’s live map.');
+    expect(onTheWay.text).toContain(`Delivery to ${ADDRESS}`);
+    expect(onTheWay.text).not.toContain('Arrives about');
+    expect(onTheWay.text).not.toContain('Croissant');
+    expect(onTheWay.subject).not.toContain('Jalan');
   });
 });

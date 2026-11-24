@@ -4,6 +4,7 @@ import {ordersRepo} from '../../../orders/repo.server';
 import {paymentProvider} from '../../../payments/select.server';
 import {alertLater} from '../../../ops/alert.server';
 import {notifyLater} from '../../../orders/notify.server';
+import {dispatchLater} from '../../../delivery/dispatch.server';
 
 /**
  * The payment provider's callback. The event is verified from its raw body and confirmed with
@@ -22,6 +23,8 @@ export const Route = createFileRoute('/api/payments/callback')({
           const applied = await ordersRepo(env.DB, env.SHOP_ID).applyPayment(event, body, new Date());
           if (applied) {
             notifyLater(event.orderId);
+            // A delivery due soon gets its rider now rather than at the next 5-minute run.
+            if (event.state === 'paid') dispatchLater(event.orderId);
             return new Response('ok');
           }
           alertLater({

@@ -6,7 +6,7 @@ Goal: customers order and pay on the shop's own site instead of Beep, in a flow 
 
 - **Stack.** TanStack Start on Cloudflare Workers, built and deployed with `cf` (`cloudflare.config.ts`, no Wrangler). D1 for orders.
 - **Payments.** CHIP (CHIP Collect). The client opens the merchant account; we need its test secret key and `brand_id`.
-- **Fulfilment.** Pick-up only at launch, with a chosen time. Delivery is a later phase.
+- **Fulfilment.** Pick-up at launch, with a chosen time. Delivery through Lalamove is built and off until the shop's keys and pin are in: see `docs/delivery-plan.md`.
 - **Kitchen.** A staff screen at `/staff` on a tablet, signed in with the shop's PIN. StoreHub POS was the first choice and is blocked (see Findings); if StoreHub ever opens an order API, it reads the same paid orders.
 - **Multi-client.** Every table carries `shop_id`. Nothing more multi-tenant than that until a second client is live.
 

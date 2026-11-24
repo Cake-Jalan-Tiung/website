@@ -17,7 +17,9 @@ import { Route as MenuRouteImport } from './routes/menu'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StressRouteImport } from './routes/stress'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
+import { Route as ApiDeliveryCallbackRouteImport } from './routes/api/delivery/callback'
 import { Route as ApiPaymentsCallbackRouteImport } from './routes/api/payments/callback'
+import { Route as DeliverTestIdRouteImport } from './routes/deliver/test/$id'
 import { Route as PayTestIdRouteImport } from './routes/pay/test/$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -60,9 +62,19 @@ const OrderIdRoute = OrderIdRouteImport.update({
   path: '/order/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDeliveryCallbackRoute = ApiDeliveryCallbackRouteImport.update({
+  id: '/api/delivery/callback',
+  path: '/api/delivery/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPaymentsCallbackRoute = ApiPaymentsCallbackRouteImport.update({
   id: '/api/payments/callback',
   path: '/api/payments/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliverTestIdRoute = DeliverTestIdRouteImport.update({
+  id: '/deliver/test/$id',
+  path: '/deliver/test/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayTestIdRoute = PayTestIdRouteImport.update({
@@ -80,7 +92,9 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
+  '/api/delivery/callback': typeof ApiDeliveryCallbackRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
+  '/deliver/test/$id': typeof DeliverTestIdRoute
   '/pay/test/$id': typeof PayTestIdRoute
 }
 export interface FileRoutesByTo {
@@ -92,7 +106,9 @@ export interface FileRoutesByTo {
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
+  '/api/delivery/callback': typeof ApiDeliveryCallbackRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
+  '/deliver/test/$id': typeof DeliverTestIdRoute
   '/pay/test/$id': typeof PayTestIdRoute
 }
 export interface FileRoutesById {
@@ -105,7 +121,9 @@ export interface FileRoutesById {
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
+  '/api/delivery/callback': typeof ApiDeliveryCallbackRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
+  '/deliver/test/$id': typeof DeliverTestIdRoute
   '/pay/test/$id': typeof PayTestIdRoute
 }
 export interface FileRouteTypes {
@@ -119,7 +137,9 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stress'
     | '/order/$id'
+    | '/api/delivery/callback'
     | '/api/payments/callback'
+    | '/deliver/test/$id'
     | '/pay/test/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -131,7 +151,9 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stress'
     | '/order/$id'
+    | '/api/delivery/callback'
     | '/api/payments/callback'
+    | '/deliver/test/$id'
     | '/pay/test/$id'
   id:
     | '__root__'
@@ -143,7 +165,9 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stress'
     | '/order/$id'
+    | '/api/delivery/callback'
     | '/api/payments/callback'
+    | '/deliver/test/$id'
     | '/pay/test/$id'
   fileRoutesById: FileRoutesById
 }
@@ -156,7 +180,9 @@ export interface RootRouteChildren {
   StaffRoute: typeof StaffRoute
   StressRoute: typeof StressRoute
   OrderIdRoute: typeof OrderIdRoute
+  ApiDeliveryCallbackRoute: typeof ApiDeliveryCallbackRoute
   ApiPaymentsCallbackRoute: typeof ApiPaymentsCallbackRoute
+  DeliverTestIdRoute: typeof DeliverTestIdRoute
   PayTestIdRoute: typeof PayTestIdRoute
 }
 
@@ -218,11 +244,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/delivery/callback': {
+      id: '/api/delivery/callback'
+      path: '/api/delivery/callback'
+      fullPath: '/api/delivery/callback'
+      preLoaderRoute: typeof ApiDeliveryCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/payments/callback': {
       id: '/api/payments/callback'
       path: '/api/payments/callback'
       fullPath: '/api/payments/callback'
       preLoaderRoute: typeof ApiPaymentsCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deliver/test/$id': {
+      id: '/deliver/test/$id'
+      path: '/deliver/test/$id'
+      fullPath: '/deliver/test/$id'
+      preLoaderRoute: typeof DeliverTestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pay/test/$id': {
@@ -244,7 +284,9 @@ const rootRouteChildren: RootRouteChildren = {
   StaffRoute: StaffRoute,
   StressRoute: StressRoute,
   OrderIdRoute: OrderIdRoute,
+  ApiDeliveryCallbackRoute: ApiDeliveryCallbackRoute,
   ApiPaymentsCallbackRoute: ApiPaymentsCallbackRoute,
+  DeliverTestIdRoute: DeliverTestIdRoute,
   PayTestIdRoute: PayTestIdRoute,
 }
 export const routeTree = rootRouteImport

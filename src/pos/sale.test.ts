@@ -41,6 +41,17 @@ describe('storehubTransaction', () => {
     expect(transaction.comment).toBe('Web order 0F9A2C, paid online (fpx), pick-up Tue 24 Nov, 8am');
   });
 
+  it('records a delivery’s food alone, and names the ride’s fee in the comment', () => {
+    const transaction = storehubTransaction({...sale, deliverySen: 800}, shop);
+    expect(transaction).toMatchObject({total: 48, subTotal: 48});
+    expect(transaction.items.map((item) => item.productId)).toEqual(['602b358b83bf530006d0e546', '683fe999d7c0ce00083fcfe5']);
+    expect(transaction.comment).toBe('Web order 0F9A2C, paid online (fpx), delivery collected Tue 24 Nov, 8am; the customer also paid RM\u00a08.00 for the ride, which is not in this sale');
+  });
+
+  it('records a pick-up as before when it has no ride', () => {
+    expect(storehubTransaction({...sale, deliverySen: null}, shop).comment).toBe('Web order 0F9A2C, paid online (fpx), pick-up Tue 24 Nov, 8am');
+  });
+
   it('records under the payment method the shop names', () => {
     expect(storehubTransaction(sale, {...shop, paymentMethod: 'Website'}).paymentMethod).toBe('Website');
   });
