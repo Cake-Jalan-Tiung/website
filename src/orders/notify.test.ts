@@ -137,6 +137,13 @@ describe('orderEmail', () => {
     expect(receipt.subject).not.toContain('Aina');
   });
 
+  it('draws the brand from the site itself: the lockup, the ready note’s Burung Tiung, Jost', () => {
+    expect(receipt.html).toContain('src="https://cakejalantiung.app/email/lockup.png"');
+    expect(receipt.html).not.toContain('/email/tiung.png');
+    expect(ready.html).toContain('src="https://cakejalantiung.app/email/tiung.png"');
+    expect(receipt.html).toContain("url('https://cakejalantiung.app/email/jost.woff2')");
+  });
+
   it('writes the pick-up date out, since an email is read later', () => {
     expect(receipt.text).toContain('Pick-up: Fri 27 Nov, 2:15pm');
     expect(receipt.text).not.toMatch(/today|tomorrow/i);

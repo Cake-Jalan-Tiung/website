@@ -1,10 +1,10 @@
 // The two emails a customer gets about an order, and when each is due. A receipt once it is
 // paid, then a note once it is ready, which brings them back to the order's page to say
 // "I'm here". Pure: the sender, the claims and the retries live in notify.server.ts.
-import {color} from '../system/tokens';
+import {color, space, tracking, typeScale, weight, type TypeRole} from '../system/tokens';
 import {formatShopDateTime} from '../storefront/hours';
 import type {Storefront} from '../storefront/model';
-import {SOLD_STATUSES, customerCopy, formatRM, orderCode, type OrderStatus, type PricedLine} from './model';
+import {CUSTOMER_STEPS, SOLD_STATUSES, customerCopy, formatRM, orderCode, type OrderStatus, type PricedLine} from './model';
 
 /** What an email needs to know about its order. */
 export type EmailOrder = {
@@ -28,6 +28,10 @@ type Page = {
   after: string;
   /** Whether to list what was bought: the receipt does, the ready note only names the code. */
   receipt: boolean;
+  /** Where the progress bar stands, as on the order's page. */
+  step: OrderStatus;
+  /** The ready note's singing Burung Tiung, beside its heading. */
+  bird: boolean;
 };
 
 /**
@@ -44,6 +48,8 @@ export const ORDER_EMAILS = {
       action: 'Follow your order',
       after: 'We’ll email you again when it’s ready.',
       receipt: true,
+      step: 'paid',
+      bird: false,
     },
   },
   ready: {
@@ -56,6 +62,8 @@ export const ORDER_EMAILS = {
       action: 'Open your order',
       after: 'When you reach the shop, tap I’m here on your order page, or give your code at the counter.',
       receipt: false,
+      step: 'ready',
+      bird: true,
     },
   },
 } as const satisfies Record<string, {isDue: (order: EmailOrder) => boolean; page: Page}>;
@@ -66,7 +74,49 @@ export const ORDER_EMAIL_KINDS = Object.keys(ORDER_EMAILS).filter((key): key is 
 const escape = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[char] ?? char);
 
-const FONT = `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
+/**
+ * The marks as scripts/build-email-art.mjs draws them into public/email/, at the size shown here:
+ * mail apps show no SVG. Rerun `pnpm email-art` after changing a size.
+ */
+const ART = {
+  lockup: {src: '/email/lockup.png', width: 260, height: 169, alt: 'Cake Jalan Tiung, baking the world a little sweeter'},
+  tiung: {src: '/email/tiung.png', width: 112, height: 119, alt: ''},
+  icon: {src: '/email/tiung-icon.png', width: 32, height: 34, alt: ''},
+} as const;
+
+/** Jost where the mail app loads web fonts (Apple Mail does); its nearest system cousins elsewhere. */
+const FONT = `Jost, Futura, 'Avenir Next', 'Century Gothic', 'Segoe UI', Helvetica, Arial, sans-serif`;
+/** The card is the site's reading measure with room either side. */
+const CARD = 600;
+const RULE = 3;
+
+/** A type role from the site's scale, written inline: mail apps drop most stylesheets. */
+function type(role: TypeRole, ink: string = color.ink) {
+  const step = typeScale[role];
+  return [
+    `font-size: ${step.size}px`,
+    `line-height: ${step.leading}px`,
+    `font-weight: ${weight[step.weight]}`,
+    `letter-spacing: ${'tracking' in step && step.tracking ? `${tracking[step.tracking]}em` : 'normal'}`,
+    'caps' in step && step.caps ? 'text-transform: uppercase' : '',
+    `color: ${ink}`,
+  ]
+    .filter(Boolean)
+    .map((declaration) => `${declaration};`)
+    .join(' ');
+}
+
+const image = (origin: string, art: (typeof ART)[keyof typeof ART]) =>
+  `<img src="${escape(origin + art.src)}" width="${art.width}" height="${art.height}" alt="${escape(art.alt)}" style="display: block; border: 0; width: ${art.width}px; height: auto;">`;
+
+/** A section under the site's thick ink rule, with its spaced-capitals label. */
+const section = (label: string, body: string) =>
+  `<tr><td class="px" style="padding: 0 ${space.lg}px ${space.lg}px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top: ${RULE}px solid ${color.ink};"><tr><td style="padding-top: ${space.sm}px;">
+<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">${escape(label)}</p>
+${body}
+</td></tr></table>
+</td></tr>`;
 
 /** The email of this kind for this order. Customer and dish names go into the body only, escaped; the subject holds nothing they typed. */
 export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Storefront, origin: string): OrderEmail {
@@ -75,67 +125,136 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
   const pickup = formatShopDateTime(store.timeZone, order.pickupAt);
   const firstName = order.customer.name.trim().split(/\s+/)[0] || 'there';
   const link = `${origin}/order/${order.id}`;
-  const lines = order.items.map((line) => ({label: line.quantity > 1 ? `${line.quantity} × ${line.name}` : line.name, amount: formatRM(line.unitSen * line.quantity)}));
-  const plainRM = (value: string) => value.replace('\u00a0', ' ');
+  const lines = order.items.map((line) => ({label: `${line.quantity} × ${line.name}`, amount: formatRM(line.unitSen * line.quantity)}));
+  const plainRM = (value: string) => value.replace(' ', ' ');
   // On the receipt only: the note is what a cake order most needs checked (the words on the cake),
   // and the paid time is what an expense claim asks for.
   const note = page.receipt ? order.customer.note.trim() : '';
   const paid = page.receipt && order.paidAt ? formatShopDateTime(store.timeZone, order.paidAt) : '';
+  const address = store.address.join(', ');
 
   const text = [
-    page.heading,
+    `${store.name}`,
     '',
+    page.heading,
     page.lead(firstName),
     '',
     `Order code: ${code}`,
+    '',
     `Pick-up: ${pickup}`,
-    `${store.name}, ${store.address.join(', ')}`,
-    ...(note ? ['', `Your note: ${note}`] : []),
-    ...(page.receipt ? ['', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total paid  ${plainRM(formatRM(order.totalSen))}`] : []),
+    `${store.name}, ${address}`,
+    `Map: ${store.mapHref}`,
+    ...(page.receipt ? ['', 'Your order', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total paid  ${plainRM(formatRM(order.totalSen))}`] : []),
     ...(paid ? [`Paid ${paid}`] : []),
+    ...(note ? ['', `Your note: ${note}`] : []),
     '',
     `${page.action}: ${link}`,
     '',
     page.after,
-    `Questions? Call ${store.phone.display}.`,
+    `Questions? Call ${store.phone.display} and give the code ${code}.`,
     '',
     store.signOff,
   ].join('\n');
 
-  const cell = `padding: 8px 0; border-bottom: 1px solid ${color.rule};`;
-  const rows = page.receipt
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 24px;">
-${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} white-space: nowrap;">${line.amount}</td></tr>`).join('\n')}
-<tr><td style="padding: 12px 0 0; font-weight: 600;">Total paid</td><td align="right" style="padding: 12px 0 0; font-weight: 600; white-space: nowrap;">${formatRM(order.totalSen)}</td></tr>
-${paid ? `<tr><td colspan="2" style="padding: 4px 0 0; font-size: 14px; color: ${color.muted};">Paid ${escape(paid)}</td></tr>` : ''}
-</table>`
+  const reached = CUSTOMER_STEPS.findIndex((step) => step.status === page.step);
+  const progress = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr>
+${CUSTOMER_STEPS.map(
+  (step, index) =>
+    `<td width="25%" valign="top" style="padding-right: ${index < CUSTOMER_STEPS.length - 1 ? space.xs : 0}px;">
+<p style="margin: 0; border-top: ${RULE}px solid ${index <= reached ? color.ink : color['cream-400']}; padding-top: ${space.xs}px; ${type('caption', index <= reached ? color.ink : color.muted)}${index === reached ? ` font-weight: ${weight.medium};` : ''}">${escape(step.label)}</p>
+</td>`,
+).join('\n')}
+</tr></table>`;
+
+  const heading = `<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Order · ${escape(firstName)}</p>
+<p style="margin: 0 0 ${space.sm}px; ${type('head')}">${code}</p>
+<p style="margin: 0 0 ${space.xs}px; ${type('subhead')}">${escape(page.heading)}</p>
+<p style="margin: 0; ${type('body')}">${escape(page.lead(firstName))}</p>`;
+
+  const hero = page.bird
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td valign="bottom">${heading}</td>
+<td valign="bottom" width="${ART.tiung.width}" style="padding-left: ${space.sm}px;">${image(origin, ART.tiung)}</td>
+</tr></table>`
+    : heading;
+
+  const cell = `padding: ${space.xs}px 0; border-bottom: 1px solid ${color.rule}; ${type('body')}`;
+  const receipt = page.receipt
+    ? section(
+        'Your order',
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} white-space: nowrap; padding-left: ${space.sm}px;">${line.amount}</td></tr>`).join('\n')}
+<tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total paid</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead')}">${formatRM(order.totalSen)}</td></tr>
+</table>
+${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Paid ${escape(paid)}</p>` : ''}
+${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr><td style="padding: ${space.sm}px; background: ${color['cream-100']};">
+<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Your note</p>
+<p style="margin: 0; ${type('body')}">${escape(note)}</p>
+</td></tr></table>` : ''}`,
+      )
     : '';
 
   const html = `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>${escape(page.heading)}</title></head>
-<body style="margin: 0; padding: 0; background: ${color['cream-100']};">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<title>${escape(page.heading)}</title>
+<style>
+@font-face { font-family: 'Jost'; font-style: normal; font-weight: 100 900; src: url('${escape(origin)}/email/jost.woff2') format('woff2'); }
+:root { color-scheme: light only; }
+@media (max-width: ${CARD + space.md}px) {
+  .px { padding-left: ${space.md}px !important; padding-right: ${space.md}px !important; }
+  .frame { padding: 0 !important; }
+}
+</style>
+</head>
+<body style="margin: 0; padding: 0; background: ${color['cream-100']}; -webkit-text-size-adjust: 100%;">
 <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escape(page.lead(firstName))} Order ${code}, pick-up ${escape(pickup)}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: ${color['cream-100']};">
-<tr><td align="center" style="padding: 32px 16px;">
-<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 480px; background: ${color.paper}; border-radius: 16px; font-family: ${FONT}; font-size: 16px; line-height: 1.5; color: ${color.ink};">
-<tr><td style="padding: 28px 28px 0; font-weight: 600; color: ${color.blue};">${escape(store.name)}</td></tr>
-<tr><td style="padding: 20px 28px 0;">
-<h1 style="margin: 0 0 8px; font-size: 26px; line-height: 1.2; font-weight: 600;">${escape(page.heading)}</h1>
-<p style="margin: 0 0 24px;">${escape(page.lead(firstName))}</p>
-<p style="margin: 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: ${color.muted};">Order code</p>
-<p style="margin: 0 0 16px; font-size: 32px; font-weight: 700; letter-spacing: 0.06em; color: ${color.blue};">${code}</p>
-<p style="margin: 0 0 4px;"><strong>Pick-up</strong> ${escape(pickup)}</p>
-<p style="margin: 0 0 24px; color: ${color.muted};">${escape(store.name)}, ${store.address.map(escape).join(', ')}</p>
-${note ? `<p style="margin: 0 0 24px; padding: 12px 16px; border-radius: 12px; background: ${color['cream-100']};"><strong>Your note</strong><br>${escape(note)}</p>` : ''}
-${rows}
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 24px;"><tr><td style="padding: 14px 28px; border-radius: 999px; background: ${color.blue};">
-<a href="${escape(link)}" style="display: inline-block; font-weight: 600; color: ${color.paper}; text-decoration: none;">${escape(page.action)}</a>
-</td></tr></table>
-<p style="margin: 0 0 8px;">${escape(page.after)}</p>
-<p style="margin: 0 0 28px; color: ${color.muted};">Questions? Call <a href="${escape(store.phone.href)}" style="color: ${color.blue};">${escape(store.phone.display)}</a>.</p>
+<tr><td class="frame" align="center" style="padding: ${space.lg}px ${space.sm}px;">
+<table role="presentation" width="${CARD}" cellpadding="0" cellspacing="0" style="width: 100%; max-width: ${CARD}px; background: ${color.paper}; font-family: ${FONT}; ${type('body')}">
+
+<tr><td class="px" align="center" style="padding: ${space.lg}px ${space.lg}px ${space.md}px; background: ${color['cream-100']};">
+<a href="${escape(origin)}" style="text-decoration: none;">${image(origin, ART.lockup)}</a>
 </td></tr>
-<tr><td style="padding: 20px 28px 28px; border-top: 1px solid ${color.rule}; color: ${color.muted}; font-size: 14px;">${escape(store.signOff)}</td></tr>
+
+<tr><td class="px" style="padding: ${space.md}px ${space.lg}px ${space.lg}px; background: ${color['cream-100']};">
+${hero}
+${progress}
+</td></tr>
+
+<tr><td style="height: ${space.lg}px; line-height: ${space.lg}px; font-size: 0;">&nbsp;</td></tr>
+
+${section(
+  'Pick-up',
+  `<p style="margin: 0 0 ${space.xs}px; ${type('subhead')}">${escape(pickup)}</p>
+<p style="margin: 0 0 ${space.xs}px; ${type('body')}">${escape(store.name)}, ${escape(address)}</p>
+<p style="margin: 0; ${type('body')}"><a href="${escape(store.mapHref)}" style="color: ${color.blue}; text-decoration: none;">Open in Google Maps ↗</a></p>`,
+)}
+
+${receipt}
+
+<tr><td class="px" style="padding: 0 ${space.lg}px ${space.lg}px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background: ${color.blue};">
+<a href="${escape(link)}" style="display: block; padding: ${space.sm}px; ${type('body', color.paper)} font-weight: ${weight.medium}; text-decoration: none; text-align: center;">${escape(page.action)}</a>
+</td></tr></table>
+<p style="margin: ${space.sm}px 0 0; ${type('body')}">${escape(page.after)}</p>
+<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Questions? Call <a href="${escape(store.phone.href)}" style="color: ${color.blue}; text-decoration: none;">${escape(store.phone.display)}</a> and give the code ${code}.</p>
+</td></tr>
+
+<tr><td class="px" style="padding: ${space.md}px ${space.lg}px ${space.lg}px; border-top: 1px solid ${color.rule};">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" style="padding-right: ${space.sm}px;">${image(origin, ART.icon)}</td>
+<td valign="middle">
+<p style="margin: 0; ${type('body')}">${escape(store.signOff)}</p>
+<p style="margin: 0; ${type('caption', color.muted)}">${escape(store.name)} · ${escape(address)}</p>
+</td>
+</tr></table>
+</td></tr>
+
 </table>
 </td></tr>
 </table>
