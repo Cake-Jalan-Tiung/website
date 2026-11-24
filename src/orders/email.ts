@@ -4,7 +4,7 @@
 import {color, space, tracking, typeScale, weight, type TypeRole} from '../system/tokens';
 import {formatShopDateTime} from '../storefront/hours';
 import type {Storefront} from '../storefront/model';
-import {CUSTOMER_STEPS, SOLD_STATUSES, customerCopy, formatRM, orderCode, type OrderStatus, type PricedLine} from './model';
+import {SOLD_STATUSES, customerCopy, formatRM, orderCode, type OrderStatus, type PricedLine} from './model';
 
 /** What an email needs to know about its order. */
 export type EmailOrder = {
@@ -28,8 +28,6 @@ type Page = {
   after: string;
   /** Whether to list what was bought: the receipt does, the ready note only names the code. */
   receipt: boolean;
-  /** Where the progress bar stands, as on the order's page. */
-  step: OrderStatus;
   /** The ready note's singing Burung Tiung, beside its heading. */
   bird: boolean;
 };
@@ -44,11 +42,10 @@ export const ORDER_EMAILS = {
     page: {
       subject: (code, pickup) => `Receipt for order ${code} · pick-up ${pickup}`,
       heading: customerCopy('paid').title,
-      lead: (firstName) => `Thank you, ${firstName}. Your order is paid and the kitchen has it.`,
+      lead: (firstName) => `Thank you, ${firstName}. The kitchen has it.`,
       action: 'Follow your order',
       after: 'We’ll email you again when it’s ready.',
       receipt: true,
-      step: 'paid',
       bird: false,
     },
   },
@@ -58,11 +55,10 @@ export const ORDER_EMAILS = {
     page: {
       subject: (code) => `Order ${code} is ready to collect`,
       heading: customerCopy('ready').title,
-      lead: (firstName) => `${firstName}, your order is ready.`,
+      lead: (firstName) => `${firstName}, it’s waiting for you at the counter.`,
       action: 'Open your order',
-      after: 'When you reach the shop, tap I’m here on your order page, or give your code at the counter.',
+      after: 'When you arrive, tap I’m here on your order page or show this code.',
       receipt: false,
-      step: 'ready',
       bird: true,
     },
   },
@@ -79,7 +75,7 @@ const escape = (value: string) =>
  * mail apps show no SVG. Rerun `pnpm email-art` after changing a size.
  */
 const ART = {
-  lockup: {src: '/email/lockup.png', width: 260, height: 169, alt: 'Cake Jalan Tiung, baking the world a little sweeter'},
+  lockup: {src: '/email/lockup.png', width: 240, height: 156, alt: 'Cake Jalan Tiung, baking the world a little sweeter'},
   tiung: {src: '/email/tiung.png', width: 112, height: 119, alt: ''},
   icon: {src: '/email/tiung-icon.png', width: 32, height: 34, alt: ''},
 } as const;
@@ -155,32 +151,22 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
     `Order code: ${code}`,
     '',
     `Pick-up: ${pickup}`,
-    `${store.name}, ${address}`,
+    address,
     `Map: ${store.mapHref}`,
-    ...(page.receipt ? ['', 'Your order', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total paid  ${plainRM(formatRM(order.totalSen))}`] : []),
+    ...(page.receipt ? ['', 'Your order', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total  ${plainRM(formatRM(order.totalSen))}`] : []),
     ...(paid ? [`Paid ${paid}`] : []),
     ...(note ? ['', `Your note: ${note}`] : []),
     '',
     `${page.action}: ${link}`,
     '',
     page.after,
-    `Questions? Call ${store.phone.display} and give the code ${code}.`,
+    `Questions? Call ${store.phone.display}.`,
     '',
     store.signOff,
     ...(store.legalName ? [store.legalName] : []),
   ].join('\n');
 
-  const reached = CUSTOMER_STEPS.findIndex((step) => step.status === page.step);
-  const progress = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr>
-${CUSTOMER_STEPS.map(
-  (step, index) =>
-    `<td width="25%" valign="top" style="padding-right: ${index < CUSTOMER_STEPS.length - 1 ? space.xs : 0}px;">
-<p style="margin: 0; border-top: ${RULE}px solid ${index <= reached ? color.ink : color['cream-400']}; padding-top: ${space.xs}px; ${type('caption', index <= reached ? color.ink : color.muted)}${index === reached ? ` font-weight: ${weight.medium};` : ''}">${escape(step.label)}</p>
-</td>`,
-).join('\n')}
-</tr></table>`;
-
-  const heading = `<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Order · ${escape(firstName)}</p>
+  const heading = `<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Order</p>
 <p style="margin: 0 0 ${space.sm}px; ${type('head', color.ink, 'mono')}">${code}</p>
 <p style="margin: 0 0 ${space.xs}px; ${type('subhead')}">${escape(page.heading)}</p>
 <p style="margin: 0; ${type('body')}">${escape(page.lead(firstName))}</p>`;
@@ -198,7 +184,7 @@ ${CUSTOMER_STEPS.map(
         'Your order',
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
 ${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} ${type('body', color.ink, 'mono')} white-space: nowrap; padding-left: ${space.sm}px;">${line.amount}</td></tr>`).join('\n')}
-<tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total paid</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead', color.ink, 'mono')} font-weight: ${weight.medium};">${formatRM(order.totalSen)}</td></tr>
+<tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead', color.ink, 'mono')} font-weight: ${weight.medium};">${formatRM(order.totalSen)}</td></tr>
 </table>
 ${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted, 'mono')}">Paid ${escape(paid)}</p>` : ''}
 ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr><td style="padding: ${space.sm}px; background: ${color['cream-100']};">
@@ -233,13 +219,12 @@ ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
 <tr><td class="frame" align="center" style="padding: ${space.lg}px ${space.sm}px;">
 <table role="presentation" width="${CARD}" cellpadding="0" cellspacing="0" style="width: 100%; max-width: ${CARD}px; background: ${color.paper}; font-family: ${FONTS.sans}; ${type('body')}">
 
-<tr><td class="px" align="center" style="padding: ${space.lg}px ${space.lg}px ${space.md}px; background: ${color['cream-100']};">
+<tr><td class="px" align="center" style="padding: ${space.md}px ${space.lg}px 0; background: ${color['cream-100']};">
 <a href="${escape(origin)}" style="text-decoration: none;">${image(origin, ART.lockup)}</a>
 </td></tr>
 
-<tr><td class="px" style="padding: ${space.md}px ${space.lg}px ${space.lg}px; background: ${color['cream-100']};">
+<tr><td class="px" style="padding: ${space.sm}px ${space.lg}px ${space.lg}px; background: ${color['cream-100']};">
 ${hero}
-${progress}
 </td></tr>
 
 <tr><td style="height: ${space.lg}px; line-height: ${space.lg}px; font-size: 0;">&nbsp;</td></tr>
@@ -247,7 +232,7 @@ ${progress}
 ${section(
   'Pick-up',
   `<p style="margin: 0 0 ${space.xs}px; ${type('subhead', color.ink, 'mono')}">${escape(pickup)}</p>
-<p style="margin: 0 0 ${space.xs}px; ${type('body')}">${escape(store.name)}, ${escape(address)}</p>
+<p style="margin: 0 0 ${space.xs}px; ${type('body')}">${escape(address)}</p>
 <p style="margin: 0; ${type('body')}"><a href="${escape(store.mapHref)}" style="color: ${color.blue}; text-decoration: none;">Open in Google Maps ↗</a></p>`,
 )}
 
@@ -258,7 +243,7 @@ ${receipt}
 <a href="${escape(link)}" style="display: block; padding: ${space.sm}px; ${type('body', color.paper)} font-weight: ${weight.medium}; text-decoration: none; text-align: center;">${escape(page.action)}</a>
 </td></tr></table>
 <p style="margin: ${space.sm}px 0 0; ${type('body')}">${escape(page.after)}</p>
-<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Questions? Call <a href="${escape(store.phone.href)}" style="color: ${color.blue}; text-decoration: none;">${escape(store.phone.display)}</a> and give the code ${code}.</p>
+<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Questions? Call <a href="${escape(store.phone.href)}" style="color: ${color.blue}; text-decoration: none;">${escape(store.phone.display)}</a>.</p>
 </td></tr>
 
 <tr><td class="px" style="padding: ${space.md}px ${space.lg}px ${space.lg}px; border-top: 1px solid ${color.rule};">
@@ -266,7 +251,6 @@ ${receipt}
 <td valign="middle" style="padding-right: ${space.sm}px;">${image(origin, ART.icon)}</td>
 <td valign="middle">
 <p style="margin: 0; ${type('body')}">${escape(store.signOff)}</p>
-<p style="margin: 0; ${type('caption', color.muted)}">${escape(store.name)} · ${escape(address)}</p>
 ${store.legalName ? `<p style="margin: 0; ${type('caption', color.muted)}">${escape(store.legalName)}</p>` : ''}
 </td>
 </tr></table>

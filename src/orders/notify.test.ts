@@ -113,7 +113,7 @@ describe('orderEmail', () => {
 
   it('lists what was bought on the receipt, and links to the order', () => {
     expect(receipt.text).toContain('2 × Croissant  RM 18.00');
-    expect(receipt.text).toContain('Total paid  RM 30.50');
+    expect(receipt.text).toContain('Total  RM 30.50');
     expect(receipt.text).toContain(`https://cakejalantiung.app/order/${ID}`);
     expect(receipt.html).toContain(`href="https://cakejalantiung.app/order/${ID}"`);
   });

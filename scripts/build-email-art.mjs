@@ -13,7 +13,7 @@ const SCALE = 3;
 
 // `width` is the width each is shown at in the email, in px; email.ts reads the same numbers from EMAIL_ART.
 const art = [
-  {name: 'lockup', mark: 'primary-lockup', width: 260, ground: 'cream-100'},
+  {name: 'lockup', mark: 'primary-lockup', width: 240, ground: 'cream-100'},
   {name: 'tiung', mark: 'burung-tiung', width: 112, ground: 'cream-100'},
   {name: 'tiung-icon', mark: 'burung-tiung-icon', width: 32, ground: 'paper'},
 ];
