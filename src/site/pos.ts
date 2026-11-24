@@ -7,10 +7,11 @@ export const storehub = {
   /** Cake Jalan Tiung | Seksyen 4 Shah Alam, the pick-up counter. */
   storeId: '560ce27f0ce34105ab775d52',
   /**
-   * The payment method web sales are recorded under. StoreHub's API document allows only Cash or
-   * CreditCard; the counter's own sales also carry custom options (MAYBANK QR, Online Bank
-   * Transfer), so one named for the website may be accepted once it is added in StoreHub's back
-   * office. Untried: change it here only after one sale under the new name has been seen in StoreHub.
+   * The payment method web sales are recorded under. StoreHub's API takes only its built-in names:
+   * tried 24 Nov 2026 with a custom option "CJT-webapp" added in the back office, it answered 409
+   * "paymentMethod 'CJT-webapp' is invalid", and a `payments` list in its place answered
+   * "paymentMethod is required field". Custom options appear on the counter's own sales but cannot
+   * be written through the API. Web sales are told apart by their WEB- invoice number and comment.
    */
   paymentMethod: 'CreditCard',
   products: {
