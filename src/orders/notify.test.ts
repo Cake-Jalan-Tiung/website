@@ -142,6 +142,14 @@ describe('orderEmail', () => {
     expect(receipt.html).not.toContain('/email/tiung.png');
     expect(ready.html).toContain('src="https://cakejalantiung.app/email/tiung.png"');
     expect(receipt.html).toContain("url('https://cakejalantiung.app/email/jost.woff2')");
+    expect(receipt.html).toContain("url('https://cakejalantiung.app/email/PaperMono-Regular.woff2')");
+  });
+
+  it('names the registered company on both emails', () => {
+    for (const email of [receipt, ready]) {
+      expect(email.html).toContain('CJT Bakery Sdn. Bhd.');
+      expect(email.text).toContain('CJT Bakery Sdn. Bhd.');
+    }
   });
 
   it('writes the pick-up date out, since an email is read later', () => {

@@ -84,21 +84,34 @@ const ART = {
   icon: {src: '/email/tiung-icon.png', width: 32, height: 34, alt: ''},
 } as const;
 
-/** Jost where the mail app loads web fonts (Apple Mail does); its nearest system cousins elsewhere. */
-const FONT = `Jost, Futura, 'Avenir Next', 'Century Gothic', 'Segoe UI', Helvetica, Arial, sans-serif`;
+/**
+ * Jost where the mail app loads web fonts (Apple Mail does); its nearest system cousins elsewhere.
+ * Paper Mono (SIL OFL 1.1, public/email/PaperMono-*.woff2 from github.com/paper-design/paper-mono)
+ * sets what a till slip would print: labels, the code, times and money. Sentences stay in Jost.
+ */
+const FONTS = {
+  sans: `Jost, Futura, 'Avenir Next', 'Century Gothic', 'Segoe UI', Helvetica, Arial, sans-serif`,
+  mono: `'Paper Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace`,
+} as const;
+type Face = keyof typeof FONTS;
+/** Mono is wide already: its capitals take less of the site's tracking, and big numbers none of the tightening. */
+const MONO_CAPS_TRACKING = 0.08;
 /** The card is the site's reading measure with room either side. */
 const CARD = 600;
 const RULE = 3;
 
-/** A type role from the site's scale, written inline: mail apps drop most stylesheets. */
-function type(role: TypeRole, ink: string = color.ink) {
+/** A type role from the site's scale, written inline: mail apps drop most stylesheets. Labels are always mono. */
+function type(role: TypeRole, ink: string = color.ink, face: Face = role === 'label' ? 'mono' : 'sans') {
   const step = typeScale[role];
+  const caps = 'caps' in step && step.caps;
+  const spacing = face === 'mono' ? (caps ? `${MONO_CAPS_TRACKING}em` : 'normal') : 'tracking' in step && step.tracking ? `${tracking[step.tracking]}em` : 'normal';
   return [
+    face === 'mono' ? `font-family: ${FONTS.mono}` : '',
     `font-size: ${step.size}px`,
     `line-height: ${step.leading}px`,
     `font-weight: ${weight[step.weight]}`,
-    `letter-spacing: ${'tracking' in step && step.tracking ? `${tracking[step.tracking]}em` : 'normal'}`,
-    'caps' in step && step.caps ? 'text-transform: uppercase' : '',
+    `letter-spacing: ${spacing}`,
+    caps ? 'text-transform: uppercase' : '',
     `color: ${ink}`,
   ]
     .filter(Boolean)
@@ -154,6 +167,7 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
     `Questions? Call ${store.phone.display} and give the code ${code}.`,
     '',
     store.signOff,
+    ...(store.legalName ? [store.legalName] : []),
   ].join('\n');
 
   const reached = CUSTOMER_STEPS.findIndex((step) => step.status === page.step);
@@ -167,7 +181,7 @@ ${CUSTOMER_STEPS.map(
 </tr></table>`;
 
   const heading = `<p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Order · ${escape(firstName)}</p>
-<p style="margin: 0 0 ${space.sm}px; ${type('head')}">${code}</p>
+<p style="margin: 0 0 ${space.sm}px; ${type('head', color.ink, 'mono')}">${code}</p>
 <p style="margin: 0 0 ${space.xs}px; ${type('subhead')}">${escape(page.heading)}</p>
 <p style="margin: 0; ${type('body')}">${escape(page.lead(firstName))}</p>`;
 
@@ -183,10 +197,10 @@ ${CUSTOMER_STEPS.map(
     ? section(
         'Your order',
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
-${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} white-space: nowrap; padding-left: ${space.sm}px;">${line.amount}</td></tr>`).join('\n')}
-<tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total paid</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead')}">${formatRM(order.totalSen)}</td></tr>
+${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} ${type('body', color.ink, 'mono')} white-space: nowrap; padding-left: ${space.sm}px;">${line.amount}</td></tr>`).join('\n')}
+<tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total paid</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead', color.ink, 'mono')} font-weight: ${weight.medium};">${formatRM(order.totalSen)}</td></tr>
 </table>
-${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted)}">Paid ${escape(paid)}</p>` : ''}
+${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted, 'mono')}">Paid ${escape(paid)}</p>` : ''}
 ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr><td style="padding: ${space.sm}px; background: ${color['cream-100']};">
 <p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Your note</p>
 <p style="margin: 0; ${type('body')}">${escape(note)}</p>
@@ -204,6 +218,8 @@ ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
 <title>${escape(page.heading)}</title>
 <style>
 @font-face { font-family: 'Jost'; font-style: normal; font-weight: 100 900; src: url('${escape(origin)}/email/jost.woff2') format('woff2'); }
+@font-face { font-family: 'Paper Mono'; font-style: normal; font-weight: 400; src: url('${escape(origin)}/email/PaperMono-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Paper Mono'; font-style: normal; font-weight: 500; src: url('${escape(origin)}/email/PaperMono-Medium.woff2') format('woff2'); }
 :root { color-scheme: light only; }
 @media (max-width: ${CARD + space.md}px) {
   .px { padding-left: ${space.md}px !important; padding-right: ${space.md}px !important; }
@@ -215,7 +231,7 @@ ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0
 <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escape(page.lead(firstName))} Order ${code}, pick-up ${escape(pickup)}.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: ${color['cream-100']};">
 <tr><td class="frame" align="center" style="padding: ${space.lg}px ${space.sm}px;">
-<table role="presentation" width="${CARD}" cellpadding="0" cellspacing="0" style="width: 100%; max-width: ${CARD}px; background: ${color.paper}; font-family: ${FONT}; ${type('body')}">
+<table role="presentation" width="${CARD}" cellpadding="0" cellspacing="0" style="width: 100%; max-width: ${CARD}px; background: ${color.paper}; font-family: ${FONTS.sans}; ${type('body')}">
 
 <tr><td class="px" align="center" style="padding: ${space.lg}px ${space.lg}px ${space.md}px; background: ${color['cream-100']};">
 <a href="${escape(origin)}" style="text-decoration: none;">${image(origin, ART.lockup)}</a>
@@ -230,7 +246,7 @@ ${progress}
 
 ${section(
   'Pick-up',
-  `<p style="margin: 0 0 ${space.xs}px; ${type('subhead')}">${escape(pickup)}</p>
+  `<p style="margin: 0 0 ${space.xs}px; ${type('subhead', color.ink, 'mono')}">${escape(pickup)}</p>
 <p style="margin: 0 0 ${space.xs}px; ${type('body')}">${escape(store.name)}, ${escape(address)}</p>
 <p style="margin: 0; ${type('body')}"><a href="${escape(store.mapHref)}" style="color: ${color.blue}; text-decoration: none;">Open in Google Maps ↗</a></p>`,
 )}
@@ -251,6 +267,7 @@ ${receipt}
 <td valign="middle">
 <p style="margin: 0; ${type('body')}">${escape(store.signOff)}</p>
 <p style="margin: 0; ${type('caption', color.muted)}">${escape(store.name)} · ${escape(address)}</p>
+${store.legalName ? `<p style="margin: 0; ${type('caption', color.muted)}">${escape(store.legalName)}</p>` : ''}
 </td>
 </tr></table>
 </td></tr>

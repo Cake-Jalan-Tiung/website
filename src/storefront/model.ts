@@ -34,6 +34,8 @@ export type Proof = {rating: number; reviews: number; source: string; asOf: stri
 
 export type Storefront = {
   name: string;
+  /** The registered company behind the shop, for receipts; omit to print none. */
+  legalName?: string;
   address: readonly string[];
   phone: {display: string; href: string};
   week: Week;

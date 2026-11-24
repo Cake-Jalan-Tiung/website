@@ -67,6 +67,8 @@ const googleListing = 'https://maps.google.com/?cid=3539512419364173597';
 // 12.00 is the price it charges.
 export const storefront: Storefront = {
   name: address.name,
+  // The registered company, as the owner gave it on 24 November 2026. No registration number yet.
+  legalName: 'CJT Bakery Sdn. Bhd.',
   address: address.lines,
   phone: {display: '012-878 7258', href: 'tel:+60128787258'},
   week: [

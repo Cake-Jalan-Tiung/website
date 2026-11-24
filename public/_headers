@@ -1,0 +1,5 @@
+# The order emails load their fonts and marks from here (src/orders/email.ts). A mail app shows
+# the email from another origin, and fonts need this to load across origins.
+/email/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400
