@@ -77,6 +77,16 @@ describe('notifyOrder', () => {
     expect(ready.attachments).toEqual([]);
   }, 20000);
 
+  it('retries the receipt without its PDF, so a PDF that failed cannot hold the email back', async () => {
+    let first = true;
+    const {deps, sent} = setup(order('paid'), () => (first ? ((first = false), new Error('network')) : null));
+    await notifyOrder(ID, deps);
+    await notifyOrder(ID, deps);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].email.attachments).toEqual([]);
+    expect(sent[0].email.text).not.toContain('PDF attached');
+  }, 20000);
+
   it('sends the ready note once the order is ready, and the receipt with it if that was missed', async () => {
     const {deps, sent} = setup(order('ready'));
     await notifyOrder(ID, deps);

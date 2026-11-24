@@ -45,11 +45,24 @@ const HAIRLINE = 0.5;
 
 type Fonts = {sans: PDFFont; sansMedium: PDFFont; mono: PDFFont; monoMedium: PDFFont};
 
-/** Lines of `text` that fit `width` at `size`, broken between words. */
+/** A word wider than `width` cut into pieces that fit, so a pasted link cannot run off the page. */
+function pieces(word: string, font: PDFFont, size: number, width: number): string[] {
+  const out: string[] = [];
+  let piece = '';
+  for (const char of word) {
+    if (piece && font.widthOfTextAtSize(piece + char, size) > width) {
+      out.push(piece);
+      piece = char;
+    } else piece += char;
+  }
+  return piece ? [...out, piece] : out;
+}
+
+/** Lines of `text` that fit `width` at `size`, broken between words, and inside a word too wide for a line. */
 function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const lines: string[] = [];
   let line = '';
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  for (const word of text.split(/\s+/).filter(Boolean).flatMap((word) => pieces(word, font, size, width))) {
     const next = line ? `${line} ${word}` : word;
     if (line && font.widthOfTextAtSize(next, size) > width) {
       lines.push(line);
@@ -61,8 +74,12 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
 
 export const receiptFilename = (orderId: string) => `Receipt-${orderCode(orderId)}.pdf`;
 
-/** The receipt for a paid order. Throws only if the PDF cannot be drawn; the email goes without it then. */
-export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<Uint8Array> {
+/**
+ * The receipt for a paid order, or null when the customer's words use characters these fonts do not
+ * have (Chinese, Tamil, emoji): the HTML email shows them, a PDF would print empty boxes. Throws only
+ * if the PDF cannot be drawn; the email goes without it either way.
+ */
+export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<Uint8Array | null> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   const fonts: Fonts = {
@@ -71,6 +88,11 @@ export async function receiptPdf(order: EmailOrder, store: Storefront): Promise<
     mono: await doc.embedFont(bytes(monoUrl), {subset: true}),
     monoMedium: await doc.embedFont(bytes(monoMediumUrl), {subset: true}),
   };
+  const drawable = (font: PDFFont, text: string) => {
+    const known = new Set(font.getCharacterSet());
+    return [...text.replace(/\s+/g, '')].every((char) => known.has(char.codePointAt(0) ?? -1));
+  };
+  if (!drawable(fonts.sansMedium, order.customer.name) || !drawable(fonts.sans, order.customer.note)) return null;
   const lockup = await doc.embedPng(bytes(lockupUrl));
   const icon = await doc.embedPng(bytes(iconUrl));
   const code = orderCode(order.id);
