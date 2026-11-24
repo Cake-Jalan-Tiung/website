@@ -18,7 +18,8 @@ export type EmailOrder = {
   arrivedAt: string | null;
 };
 
-export type OrderEmail = {subject: string; text: string; html: string};
+export type Attachment = {filename: string; type: string; content: Uint8Array};
+export type OrderEmail = {subject: string; text: string; html: string; attachments?: readonly Attachment[]};
 
 type Page = {
   subject: (code: string, pickup: string) => string;
@@ -128,7 +129,7 @@ ${body}
 </td></tr>`;
 
 /** The email of this kind for this order. Customer and dish names go into the body only, escaped; the subject holds nothing they typed. */
-export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Storefront, origin: string): OrderEmail {
+export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Storefront, origin: string, receiptAttached = false): OrderEmail {
   const page: Page = ORDER_EMAILS[kind].page;
   const code = orderCode(order.id);
   const pickup = formatShopDateTime(store.timeZone, order.pickupAt);
@@ -139,7 +140,7 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
   // On the receipt only: the note is what a cake order most needs checked (the words on the cake),
   // and the paid time is what an expense claim asks for.
   const note = page.receipt ? order.customer.note.trim() : '';
-  const paid = page.receipt && order.paidAt ? formatShopDateTime(store.timeZone, order.paidAt) : '';
+  const paid = page.receipt && order.paidAt ? `Paid ${formatShopDateTime(store.timeZone, order.paidAt)}${receiptAttached ? ' · PDF attached' : ''}` : '';
   const address = store.address.join(', ');
 
   const text = [
@@ -154,7 +155,7 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
     address,
     `Map: ${store.mapHref}`,
     ...(page.receipt ? ['', 'Your order', ...lines.map((line) => `${line.label}  ${plainRM(line.amount)}`), `Total  ${plainRM(formatRM(order.totalSen))}`] : []),
-    ...(paid ? [`Paid ${paid}`] : []),
+    ...(paid ? [paid] : []),
     ...(note ? ['', `Your note: ${note}`] : []),
     '',
     `${page.action}: ${link}`,
@@ -186,7 +187,7 @@ export function orderEmail(kind: OrderEmailKind, order: EmailOrder, store: Store
 ${lines.map((line) => `<tr><td style="${cell}">${escape(line.label)}</td><td align="right" style="${cell} ${type('body', color.ink, 'mono')} white-space: nowrap; padding-left: ${space.sm}px;">${line.amount}</td></tr>`).join('\n')}
 <tr><td style="padding-top: ${space.sm}px; ${type('body')} font-weight: ${weight.medium};">Total</td><td align="right" style="padding-top: ${space.sm}px; white-space: nowrap; ${type('subhead', color.ink, 'mono')} font-weight: ${weight.medium};">${formatRM(order.totalSen)}</td></tr>
 </table>
-${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted, 'mono')}">Paid ${escape(paid)}</p>` : ''}
+${paid ? `<p style="margin: ${space.xs}px 0 0; ${type('caption', color.muted, 'mono')}">${escape(paid)}</p>` : ''}
 ${note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: ${space.md}px;"><tr><td style="padding: ${space.sm}px; background: ${color['cream-100']};">
 <p style="margin: 0 0 ${space.xs}px; ${type('label', color.muted)}">Your note</p>
 <p style="margin: 0; ${type('body')}">${escape(note)}</p>

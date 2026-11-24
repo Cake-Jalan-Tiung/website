@@ -44,7 +44,14 @@ function deps(target: NotifyEnv, now: Date): NotifyDeps {
       },
     },
     async send(to, email) {
-      await target.ORDER_EMAIL.send({to, from: {email: FROM, name: storefront.name}, subject: email.subject, text: email.text, html: email.html});
+      await target.ORDER_EMAIL.send({
+        to,
+        from: {email: FROM, name: storefront.name},
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+        attachments: email.attachments?.map((file) => ({disposition: 'attachment' as const, ...file})),
+      });
     },
     alert: (alert) => sendAlert(alert, target, now),
     store: storefront,

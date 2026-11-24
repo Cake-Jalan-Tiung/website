@@ -4,7 +4,7 @@
 // most, so a mistyped address does not retry forever. Sending never throws: an email must not
 // break the payment or the kitchen step that made it due.
 import type {Alert} from '../ops/alert.server';
-import {ORDER_EMAILS, ORDER_EMAIL_KINDS, orderEmail, type EmailOrder, type OrderEmail, type OrderEmailKind} from './email';
+import {ORDER_EMAILS, ORDER_EMAIL_KINDS, orderEmail, type Attachment, type EmailOrder, type OrderEmail, type OrderEmailKind} from './email';
 import {orderCode} from './model';
 import type {Storefront} from '../storefront/model';
 
@@ -27,6 +27,20 @@ export type NotifyDeps = {
   now: Date;
 };
 
+/**
+ * The receipt as a PDF, or none if it cannot be drawn: the email matters more than its attachment.
+ * pdf-lib loads only here, so no page request pays for it.
+ */
+async function receiptAttachment(order: EmailOrder, store: Storefront): Promise<Attachment[]> {
+  try {
+    const {receiptPdf, receiptFilename} = await import('./receipt-pdf');
+    return [{filename: receiptFilename(order.id), type: 'application/pdf', content: await receiptPdf(order, store)}];
+  } catch (error) {
+    console.error('Receipt PDF not drawn', error);
+    return [];
+  }
+}
+
 /** Sends whatever this order is due and has not had. */
 export async function notifyOrder(id: string, deps: NotifyDeps): Promise<void> {
   try {
@@ -36,9 +50,10 @@ export async function notifyOrder(id: string, deps: NotifyDeps): Promise<void> {
       if (!ORDER_EMAILS[kind].isDue(order)) continue;
       const attempt = await deps.emails.claim(order.id, kind, deps.now);
       if (attempt === null) continue;
+      const attachments = ORDER_EMAILS[kind].page.receipt ? await receiptAttachment(order, deps.store) : [];
       let failure: unknown = null;
       try {
-        await deps.send(order.email, orderEmail(kind, order, deps.store, deps.origin));
+        await deps.send(order.email, {...orderEmail(kind, order, deps.store, deps.origin, attachments.length > 0), attachments});
       } catch (error) {
         failure = error ?? 'unknown error';
       }

@@ -67,6 +67,16 @@ describe('notifyOrder', () => {
     expect(sent[0].email.subject).toBe('Receipt for order K3F9QA · pick-up Fri 27 Nov, 2:15pm');
   });
 
+  it('attaches the receipt as a PDF to the receipt only', async () => {
+    const {deps, sent} = setup(order('ready'));
+    await notifyOrder(ID, deps);
+    const [receipt, ready] = sent.map((s) => s.email);
+    expect(receipt.attachments?.map((file) => [file.filename, file.type])).toEqual([['Receipt-K3F9QA.pdf', 'application/pdf']]);
+    expect(new TextDecoder().decode(receipt.attachments?.[0].content.slice(0, 5))).toBe('%PDF-');
+    expect(receipt.text).toContain('PDF attached');
+    expect(ready.attachments).toEqual([]);
+  }, 20000);
+
   it('sends the ready note once the order is ready, and the receipt with it if that was missed', async () => {
     const {deps, sent} = setup(order('ready'));
     await notifyOrder(ID, deps);

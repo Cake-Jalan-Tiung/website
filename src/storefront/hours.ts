@@ -91,6 +91,12 @@ export function formatShopTime(timeZone: string, iso: string, now: Date = new Da
   return `${dayLabel(timeZone, at, now)}, ${formatMinutes(at.minutes)}`;
 }
 
+/** A moment on the shop's clock with its year, for papers kept for years ("Fri 27 Nov 2026, 2:15pm"). */
+export function formatShopRecord(timeZone: string, iso: string) {
+  const at = shopClock(timeZone, new Date(iso));
+  return `${calendarLabel(at)} ${at.year}, ${formatMinutes(at.minutes)}`;
+}
+
 /** A moment on the shop's clock with its date always written out ("Fri 27 Nov, 2:15pm"), for records read long after. */
 export function formatShopDateTime(timeZone: string, iso: string) {
   const at = shopClock(timeZone, new Date(iso));
