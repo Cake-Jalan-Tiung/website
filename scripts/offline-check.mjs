@@ -32,7 +32,10 @@ async function withServer(run) {
 
 await withServer(async (base) => {
   const browser = await (process.env.OFFLINE_BROWSER === 'webkit' ? webkit : chromium).launch();
-  const context = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true});
+  // In Safari's engine the phone is an iPhone, so the page treats it as one.
+  const iphone = process.env.OFFLINE_BROWSER === 'webkit';
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+  const context = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true, ...(iphone ? {userAgent: IPHONE} : {})});
   const page = await context.newPage();
   const errors = [];
   let offline = false;
@@ -112,6 +115,22 @@ await withServer(async (base) => {
   });
   check(afterDeploy.menuFresh, 'a menu loaded online replaces the kept copy');
   check(afterDeploy.oldGone && afterDeploy.left > 0, `files of an earlier deploy are let go (${afterDeploy.left} kept)`);
+
+  // The footer's offer: Chrome's own prompt behind a button, or on an iPhone the Share steps.
+  const footer = page.locator('footer');
+  if (iphone) {
+    await footer.getByRole('button', {name: 'Add to your home screen'}).click();
+    check(await footer.getByText(/choose Add to Home Screen/).isVisible(), 'the footer gives an iPhone the Share steps');
+  } else {
+    await page.evaluate(() => {
+      const offer = new Event('beforeinstallprompt', {cancelable: true});
+      offer.prompt = async () => void (window.cjtPrompted = true);
+      offer.userChoice = Promise.resolve({outcome: 'accepted'});
+      window.dispatchEvent(offer);
+    });
+    await footer.getByRole('button', {name: 'Install the app'}).click();
+    check(await page.evaluate(() => window.cjtPrompted === true), 'the footer\'s Install the app opens the browser\'s prompt');
+  }
 
   check(errors.length === 0, errors.length ? `errors in the page:\n  ${errors.join('\n  ')}` : 'no errors in the page');
   await browser.close();

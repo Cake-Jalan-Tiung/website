@@ -22,6 +22,8 @@ import {formatDistance} from '../delivery/model';
 import {formatShopTime, midSentence} from '../storefront/hours';
 import {orderAgainLines, rememberOrder} from './recent';
 import {useNow} from '../storefront/now';
+import {install, useInstallWay} from '../storefront/install';
+import {InstallSteps} from '../storefront/install-offer';
 import s from './orders.module.css';
 
 const POLL_MS = 4000;
@@ -163,6 +165,8 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
           </section>
         )}
 
+        {inKitchen || finished ? <InstallCard /> : null}
+
         <section className={s.block} aria-labelledby="items">
           <Label ink="secondary" as="h2" id="items">Your order</Label>
           <ul className={s.items}>
@@ -183,6 +187,40 @@ export function OrderStatusPage({initial}: {initial: PublicOrder}) {
         </section>
       </div>
     </Page>
+  );
+}
+
+const INSTALL_DISMISSED_KEY = 'cjt.install.dismissed';
+
+/**
+ * Offers the app once the order is paid, when a customer has a reason to come back: the order
+ * itself, then the next one. Not now puts it away on this device; the footer still offers it.
+ */
+function InstallCard() {
+  const way = useInstallWay();
+  const [dismissed, setDismissed] = useState(true);
+  useEffect(() => setDismissed(window.localStorage.getItem(INSTALL_DISMISSED_KEY) !== null), []);
+  if (dismissed || (way !== 'prompt' && way !== 'ios')) return null;
+  const dismiss = () => {
+    window.localStorage.setItem(INSTALL_DISMISSED_KEY, new Date().toISOString());
+    setDismissed(true);
+  };
+  return (
+    <section className={s.block} aria-labelledby="install">
+      <Label ink="secondary" as="h2" id="install">On your phone</Label>
+      <Type role="subhead" as="p">Add {storefront.shortName ?? storefront.name} to your home screen</Type>
+      <Type role="body">Come back to this order from there, and order again next time. The menu opens even without a signal.</Type>
+      {way === 'prompt' ? (
+        <Cta onClick={() => void install()}>Install the app</Cta>
+      ) : (
+        <Type role="body">
+          <InstallSteps />
+        </Type>
+      )}
+      <button type="button" className={s.textButton} onClick={dismiss}>
+        <Label ink="blue">Not now</Label>
+      </button>
+    </section>
   );
 }
 

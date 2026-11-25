@@ -16,7 +16,9 @@ const out = process.argv[2] ?? join(tmpdir(), 'cjt-walk');
 mkdirSync(out, {recursive: true});
 
 const browser = await (process.env.WALK_BROWSER === 'webkit' ? webkit : chromium).launch();
-const phone = {viewport: {width: 390, height: 844}, deviceScaleFactor: 2, isMobile: true, hasTouch: true};
+// In Safari's engine the walk is an iPhone, so the page treats it as one.
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+const phone = {viewport: {width: 390, height: 844}, deviceScaleFactor: 2, isMobile: true, hasTouch: true, ...(process.env.WALK_BROWSER === 'webkit' ? {userAgent: IPHONE} : {})};
 const context = await browser.newContext(phone);
 const page = await context.newPage();
 const errors = [];
@@ -158,6 +160,37 @@ await page.waitForURL(/\/order\//);
 await settle();
 await screen('order-paid', {full: true});
 const orderUrl = page.url();
+
+// The paid order offers the app: Chrome's own prompt behind a button, or on an iPhone the Share steps.
+const installCard = page.getByRole('region', {name: 'On your phone'});
+const iphone = process.env.WALK_BROWSER === 'webkit';
+// Chrome offers its prompt when it judges the site installable; here the offer is made by hand.
+const offerInstall = () =>
+  page.evaluate(() => {
+    const offer = new Event('beforeinstallprompt', {cancelable: true});
+    offer.prompt = async () => void (window.cjtPrompted = (window.cjtPrompted ?? 0) + 1);
+    offer.userChoice = Promise.resolve({outcome: 'dismissed'});
+    window.dispatchEvent(offer);
+  });
+if (iphone) {
+  expect(await installCard.getByText(/Add to Home Screen/).isVisible(), 'an iPhone gets the Add to Home Screen steps');
+} else {
+  expect((await installCard.count()) === 0, 'no offer before the browser offers to install');
+  await offerInstall();
+}
+await screen('order-install', {full: true});
+if (!iphone) {
+  await installCard.getByRole('button', {name: /^Install the app/}).click();
+  expect((await page.evaluate(() => window.cjtPrompted)) === 1, 'Install the app opens the browser\'s prompt');
+  expect((await installCard.count()) === 0, 'a prompt once shown is not offered again');
+  await offerInstall();
+}
+await installCard.getByRole('button', {name: 'Not now'}).click();
+await page.reload({waitUntil: 'networkidle'});
+await settle();
+if (!iphone) await offerInstall();
+await page.waitForTimeout(300);
+expect((await installCard.count()) === 0, 'Not now puts the offer away on this device');
 const orderCode = (await page.locator('p').filter({hasText: /^[0-9A-F]{6}$/}).first().textContent())?.trim();
 
 // Back on the home page, the order in the kitchen is one tap away, on a card that rises a beat after the page.

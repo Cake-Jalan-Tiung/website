@@ -8,6 +8,7 @@ import {Link} from '@astryxdesign/core/Link';
 import {Field} from '../system/Field';
 import {Label, PinkDot, Price, Stage, TypesetWordmark} from '../system/components';
 import {PrimaryLockup} from '../marks/marks.generated';
+import {InstallEntry} from './install-offer';
 import {Band, Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {dishIndex, dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
@@ -554,6 +555,7 @@ export function StoreFooter({store}: {store: Storefront}) {
                 {action.label}
               </FooterLink>
             ))}
+            <InstallEntry />
           </FooterColumn>
           <FooterColumn title="Visit">
             <Address lines={store.address} />

@@ -307,6 +307,8 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 
 /* A plain link on ink: the text keeps its legal ink, the underline comes on hover and focus. */
 .plainLink { color: var(--cjt-color-cream-400); text-decoration: none; }
+/* A footer action that is not a link, drawn as one. */
+.plainButton { padding: 0; border: 0; background: none; font: inherit; text-align: start; cursor: pointer; }
 .plainLink:focus-visible { text-decoration: underline; text-underline-offset: 0.2em; }
 @media (hover: hover) {
   .plainLink:hover { text-decoration: underline; text-underline-offset: 0.2em; }
