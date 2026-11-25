@@ -74,6 +74,7 @@ With `PAYMENTS=fake`, checkout opens a built-in test payment page and no money m
 | `pnpm typecheck` | Generates Worker types, then type-checks |
 | `pnpm fit` | Every page at six widths; fails on anything that overflows or a console error |
 | `pnpm walk` | Orders on a phone from home to paid against a running dev server, screenshot per screen; fails on a spill, a console error or a broken step. `WALK_BROWSER=webkit` walks it in Safari's engine |
+| `pnpm offline` | Builds, then checks the installed shop on a phone against the build: the manifest and icons, the service worker taking the page, the home page and menu opening and taking a dish offline, other pages leading to `/offline`, and an earlier deploy's files let go. `OFFLINE_BROWSER=webkit` checks it in Safari's engine |
 | `pnpm spec` | Rendered components against the brand's Paper measurements |
 | `pnpm photos` | Writes each photo in `src/assets/photos` at the widths the site shows, as WebP; run after adding one |
 | `pnpm icons` | Draws the favicon and the home-screen icons into `public/` from the brand marks; run after a mark changes |

@@ -13,7 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as ExportRouteImport } from './routes/export'
+import { Route as ManifestDotwebmanifestRouteImport } from './routes/manifest[.]webmanifest'
 import { Route as MenuRouteImport } from './routes/menu'
+import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StressRouteImport } from './routes/stress'
 import { Route as OrderIdRouteImport } from './routes/order/$id'
@@ -42,9 +44,19 @@ const ExportRoute = ExportRouteImport.update({
   path: '/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ManifestDotwebmanifestRoute = ManifestDotwebmanifestRouteImport.update({
+  id: '/manifest.webmanifest',
+  path: '/manifest.webmanifest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MenuRoute = MenuRouteImport.update({
   id: '/menu',
   path: '/menu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineRoute = OfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StaffRoute = StaffRouteImport.update({
@@ -88,7 +100,9 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/design-system': typeof DesignSystemRoute
   '/export': typeof ExportRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/menu': typeof MenuRoute
+  '/offline': typeof OfflineRoute
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
@@ -102,7 +116,9 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/design-system': typeof DesignSystemRoute
   '/export': typeof ExportRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/menu': typeof MenuRoute
+  '/offline': typeof OfflineRoute
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
@@ -117,7 +133,9 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/design-system': typeof DesignSystemRoute
   '/export': typeof ExportRoute
+  '/manifest.webmanifest': typeof ManifestDotwebmanifestRoute
   '/menu': typeof MenuRoute
+  '/offline': typeof OfflineRoute
   '/staff': typeof StaffRoute
   '/stress': typeof StressRoute
   '/order/$id': typeof OrderIdRoute
@@ -133,7 +151,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/design-system'
     | '/export'
+    | '/manifest.webmanifest'
     | '/menu'
+    | '/offline'
     | '/staff'
     | '/stress'
     | '/order/$id'
@@ -147,7 +167,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/design-system'
     | '/export'
+    | '/manifest.webmanifest'
     | '/menu'
+    | '/offline'
     | '/staff'
     | '/stress'
     | '/order/$id'
@@ -161,7 +183,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/design-system'
     | '/export'
+    | '/manifest.webmanifest'
     | '/menu'
+    | '/offline'
     | '/staff'
     | '/stress'
     | '/order/$id'
@@ -176,7 +200,9 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   DesignSystemRoute: typeof DesignSystemRoute
   ExportRoute: typeof ExportRoute
+  ManifestDotwebmanifestRoute: typeof ManifestDotwebmanifestRoute
   MenuRoute: typeof MenuRoute
+  OfflineRoute: typeof OfflineRoute
   StaffRoute: typeof StaffRoute
   StressRoute: typeof StressRoute
   OrderIdRoute: typeof OrderIdRoute
@@ -216,11 +242,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/manifest.webmanifest': {
+      id: '/manifest.webmanifest'
+      path: '/manifest.webmanifest'
+      fullPath: '/manifest.webmanifest'
+      preLoaderRoute: typeof ManifestDotwebmanifestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/menu': {
       id: '/menu'
       path: '/menu'
       fullPath: '/menu'
       preLoaderRoute: typeof MenuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline': {
+      id: '/offline'
+      path: '/offline'
+      fullPath: '/offline'
+      preLoaderRoute: typeof OfflineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/staff': {
@@ -280,7 +320,9 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   DesignSystemRoute: DesignSystemRoute,
   ExportRoute: ExportRoute,
+  ManifestDotwebmanifestRoute: ManifestDotwebmanifestRoute,
   MenuRoute: MenuRoute,
+  OfflineRoute: OfflineRoute,
   StaffRoute: StaffRoute,
   StressRoute: StressRoute,
   OrderIdRoute: OrderIdRoute,

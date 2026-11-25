@@ -9,7 +9,7 @@ import {spawn} from 'node:child_process';
 import {chromium} from 'playwright-core';
 import {findSpills} from './spills.mjs';
 
-const PAGES = ['/', '/menu', '/checkout', '/staff', '/design-system', '/stress'];
+const PAGES = ['/', '/menu', '/checkout', '/staff', '/offline', '/design-system', '/stress'];
 const WIDTHS = [320, 390, 768, 900, 1024, 1440];
 // Laptop windows wide enough for the home page's street, where the hero must be the first screen exactly.
 const STREET = [[1280, 720], [1440, 800], [1920, 1080]];

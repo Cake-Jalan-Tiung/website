@@ -20,6 +20,7 @@
     "spec": "node scripts/spec-check.mjs",
     "fit": "node scripts/fit-check.mjs",
     "walk": "node scripts/walk.mjs",
+    "offline": "node scripts/offline-check.mjs",
     "export": "node scripts/export.mjs",
     "test": "vitest run",
     "deploy": "cf deploy",

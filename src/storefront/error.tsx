@@ -12,21 +12,42 @@ import {Sections} from './sections';
  */
 export function ErrorPage({error}: ErrorComponentProps) {
   const router = useRouter();
-  const online = useSyncExternalStore(onConnectionChange, () => navigator.onLine, () => true);
+  const online = useOnline();
   useEffect(() => console.error(error), [error]);
+  return (
+    <Unreachable
+      title={online ? 'This page didn’t load' : 'You’re offline'}
+      line={online ? 'Try again in a moment.' : 'Check your connection, then try again.'}
+      retry={() => void router.invalidate()}
+    />
+  );
+}
+
+/**
+ * Where the service worker sends a page it has not kept when the network failed to bring it.
+ * That failure is the evidence, so the page says offline whatever `navigator.onLine` claims;
+ * Try again asks for the page afresh.
+ */
+export function OfflinePage({from}: {from: string}) {
+  return <Unreachable title="You’re offline" line="Check your connection, then try again. The menu still opens while you wait." retry={() => window.location.assign(from)} />;
+}
+
+function Unreachable({title, line, retry}: {title: string; line: string; retry: () => void}) {
   return (
     <Sections>
       <Stack gap="lg">
         <Stack gap="sm">
-          <Type role="display" as="h1">{online ? 'This page didn’t load' : 'You’re offline'}</Type>
-          <Type role="body" as="p">{online ? 'Try again in a moment.' : 'Check your connection, then try again.'}</Type>
+          <Type role="display" as="h1">{title}</Type>
+          <Type role="body" as="p">{line}</Type>
         </Stack>
-        <Cta onClick={() => void router.invalidate()}>Try again</Cta>
+        <Cta onClick={retry}>Try again</Cta>
         <Link href="/menu">See the menu</Link>
       </Stack>
     </Sections>
   );
 }
+
+const useOnline = () => useSyncExternalStore(onConnectionChange, () => navigator.onLine, () => true);
 
 function onConnectionChange(listener: () => void) {
   window.addEventListener('online', listener);

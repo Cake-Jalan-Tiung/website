@@ -35,6 +35,8 @@ export type Proof = {rating: number; reviews: number; source: string; asOf: stri
 
 export type Storefront = {
   name: string;
+  /** The name under the icon on a phone's home screen, where about 12 characters fit; omit when the name fits. */
+  shortName?: string;
   /** The registered company behind the shop, for receipts; omit to print none. */
   legalName?: string;
   address: readonly string[];

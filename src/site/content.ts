@@ -67,6 +67,8 @@ const googleListing = 'https://maps.google.com/?cid=3539512419364173597';
 // 12.00 is the price it charges.
 export const storefront: Storefront = {
   name: address.name,
+  // What the shop calls itself for short: CJT Bakery, CJT chocolate chip cookies.
+  shortName: 'CJT',
   // The registered company, as the owner gave it on 24 November 2026. No registration number yet.
   legalName: 'CJT Bakery Sdn. Bhd.',
   address: address.lines,

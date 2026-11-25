@@ -17,3 +17,7 @@ export function canonicalRedirect(request: Request, siteUrl: string): Response |
   // permanent one, and that host also serves previews and a new shop before its domain is on.
   return Response.redirect(`${site.origin}${url.pathname}${url.search}`, www ? 301 : 302);
 }
+
+/** A path on this site, or the menu: for a query value anyone can write, so it never leads off-site. */
+export const pathOnSite = (value: unknown): string =>
+  typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') ? value : '/menu';

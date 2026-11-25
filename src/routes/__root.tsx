@@ -14,6 +14,8 @@ import {StoreLink} from '../storefront/link';
 import {refreshAvailability} from '../orders/availability-store';
 import {getDelivers} from '../orders/functions';
 import {color} from '../system/tokens';
+import {storefront} from '../site/content';
+import {MANIFEST_PATH} from '../storefront/manifest';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -21,6 +23,8 @@ export const Route = createRootRoute({
       {charSet: 'utf-8'},
       {name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover'},
       {name: 'theme-color', content: color.paper},
+      // iOS names a home-screen app from this rather than the manifest.
+      {name: 'apple-mobile-web-app-title', content: storefront.shortName ?? storefront.name},
       {title: 'Cake Jalan Tiung — Shah Alam'},
     ],
     links: [
@@ -29,6 +33,7 @@ export const Route = createRootRoute({
       // Drawn from the brand marks by `pnpm icons`.
       {rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32'},
       {rel: 'apple-touch-icon', href: '/apple-touch-icon.png'},
+      {rel: 'manifest', href: MANIFEST_PATH},
     ],
   }),
   // Whether the site delivers is fixed per deploy: asked once, on the server for the first page.
@@ -39,6 +44,7 @@ export const Route = createRootRoute({
   component: () => (
     <>
       <AfterNavigate />
+      <OfflineReady />
       <Outlet />
     </>
   ),
@@ -62,6 +68,24 @@ function AfterNavigate() {
       }),
     [router],
   );
+  return null;
+}
+
+/**
+ * Hands the page to the service worker (public/sw.js), which keeps the menu for offline use.
+ * Only in a production build: `vite dev` pages load their code from source, not /assets/.
+ */
+function OfflineReady() {
+  useEffect(() => {
+    if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+    // A page that loaded before the worker ran hands it the files it loaded, so what it shows opens offline.
+    const loadedAlone = navigator.serviceWorker.controller === null;
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then((registration) => loadedAlone && registration.active?.postMessage({loaded: performance.getEntriesByType('resource').map((entry) => entry.name)}))
+      .catch(() => undefined);
+  }, []);
   return null;
 }
 
