@@ -30,6 +30,9 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
 }
 .brand { display: flex; flex-shrink: 0; align-items: center; gap: var(--cjt-space-xs); color: inherit; text-decoration: none; }
 .brand:focus-visible { outline: 2px solid var(--cjt-color-blue); outline-offset: 4px; }
+/* The owner's choice (25 Nov 2026): the primary lockup, sized to the bar at every width. That is
+   under the 180px Grammar 04 gives the drawn letters, so the promise line reads as texture here. */
+.lockup { display: block; height: calc(var(--store-header-h) - 2 * var(--cjt-space-xs)); width: auto; }
 .nav {
   display: flex;
   padding: var(--cjt-space-xs);
@@ -333,10 +336,9 @@ html:has(.rail) { scroll-padding-top: calc(var(--store-header-h) + var(--store-r
   .nav { justify-content: flex-end; }
   .headerAction { display: none; }
 }
-/* Between a phone and a wide screen the bag's ticket needs the room: the bird alone stands for the
-   shop, and the links sit a step closer, so all three stay whole. */
+/* Between a phone and a wide screen the bag's ticket needs the room: the links sit a step closer,
+   so all three stay whole. */
 @media (max-width: 899px) {
-  .brandName { display: none; }
   .nav { gap: var(--cjt-space-sm); }
 }
 @media (max-width: 299px) {

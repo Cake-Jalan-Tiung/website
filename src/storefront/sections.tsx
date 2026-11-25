@@ -6,7 +6,8 @@ import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {Link} from '@astryxdesign/core/Link';
 import {Field} from '../system/Field';
-import {Label, PinkDot, Price, Stage, Tiung, TypesetWordmark} from '../system/components';
+import {Label, PinkDot, Price, Stage, TypesetWordmark} from '../system/components';
+import {PrimaryLockup} from '../marks/marks.generated';
 import {Band, Columns, Row, Stack} from '../system/layout';
 import {Type} from '../system/Type';
 import {dishIndex, dishesById, type Action, type Category, type Dish, type Drawing, type Proof, type Storefront} from './model';
@@ -24,7 +25,7 @@ import {useDelivers} from './delivers';
 import s from './storefront.module.css';
 
 /**
- * Browsing: one slim sticky bar with the bird and wordmark home, the shop's pages and Order now
+ * Browsing: one slim sticky bar with the shop's lockup home, the shop's pages and Order now
  * or the bag. Checkout and the order page are `focus`: no nav, only the way home and back to
  * the menu, so nothing pulls away from paying.
  */
@@ -34,10 +35,7 @@ export function StoreHeader({store, mode = 'browse', onMenu = false}: {store: St
       <Field as="header" colour="paper" outlined={false} className={s.header}>
         <div className={s.headerInner}>
           <StoreLink href="/" className={s.brand} aria-label={`${store.name}, home`}>
-            <Tiung size={32} aria-hidden />
-            <span className={s.brandName}>
-              <TypesetWordmark role="caption" />
-            </span>
+            <PrimaryLockup className={s.lockup} aria-hidden />
           </StoreLink>
           {mode === 'browse' ? (
             <>
