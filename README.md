@@ -76,6 +76,7 @@ With `PAYMENTS=fake`, checkout opens a built-in test payment page and no money m
 | `pnpm walk` | Orders on a phone from home to paid against a running dev server, screenshot per screen; fails on a spill, a console error or a broken step. `WALK_BROWSER=webkit` walks it in Safari's engine |
 | `pnpm spec` | Rendered components against the brand's Paper measurements |
 | `pnpm photos` | Writes each photo in `src/assets/photos` at the widths the site shows, as WebP; run after adding one |
+| `pnpm icons` | Draws the favicon and the home-screen icons into `public/` from the brand marks; run after a mark changes |
 | `pnpm build` | Production build |
 | `pnpm deploy` | Deploy to Cloudflare |
 

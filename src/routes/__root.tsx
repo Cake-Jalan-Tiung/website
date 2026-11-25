@@ -23,8 +23,13 @@ export const Route = createRootRoute({
       {name: 'theme-color', content: color.paper},
       {title: 'Cake Jalan Tiung — Shah Alam'},
     ],
-    // Every page sets its words in Jost: fetched with the page, so the first paint is already in it.
-    links: [{rel: 'preload', href: jost, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous'}],
+    links: [
+      // Every page sets its words in Jost: fetched with the page, so the first paint is already in it.
+      {rel: 'preload', href: jost, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous'},
+      // Drawn from the brand marks by `pnpm icons`.
+      {rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32'},
+      {rel: 'apple-touch-icon', href: '/apple-touch-icon.png'},
+    ],
   }),
   // Whether the site delivers is fixed per deploy: asked once, on the server for the first page.
   loader: () => getDelivers(),
@@ -32,12 +37,10 @@ export const Route = createRootRoute({
   shellComponent: Shell,
   notFoundComponent: NotFound,
   component: () => (
-    <Theme theme={themes[defaultThemeSlug]} mode={themeModes[defaultThemeSlug]}>
-      <LinkProvider component={StoreLink}>
-        <AfterNavigate />
-        <Outlet />
-      </LinkProvider>
-    </Theme>
+    <>
+      <AfterNavigate />
+      <Outlet />
+    </>
   ),
 });
 
@@ -74,6 +77,7 @@ function NotFound() {
   );
 }
 
+/** The theme and the site's links sit around every page, an error raised by the root itself included. */
 function Shell({children}: {children: ReactNode}) {
   return (
     <html lang="en">
@@ -81,7 +85,9 @@ function Shell({children}: {children: ReactNode}) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <Theme theme={themes[defaultThemeSlug]} mode={themeModes[defaultThemeSlug]}>
+          <LinkProvider component={StoreLink}>{children}</LinkProvider>
+        </Theme>
         <Scripts />
       </body>
     </html>

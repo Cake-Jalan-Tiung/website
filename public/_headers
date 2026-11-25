@@ -3,3 +3,8 @@
 /email/*
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=86400
+
+# Vite names every file here by its content, so a changed file gets a new name: browsers keep
+# them for a year without asking again.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

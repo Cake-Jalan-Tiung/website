@@ -35,8 +35,8 @@ export default defineConfig(({mode}) => ({
       // domains. Empty: checkout finds addresses from the stand-in list, which only DELIVERY=fake uses.
       GOOGLE_MAPS_KEY: bindings.text(''),
     },
-    // The shop's own address. workers.dev stays on beside it: payments started there return
-    // there, and links to it keep working.
+    // The shop's own address. www. and workers.dev move pages to SITE_URL (src/lib/canonical.ts);
+    // workers.dev stays on so old links still arrive and callbacks for orders placed there land.
     domains: ['cakejalantiung.app', 'www.cakejalantiung.app'],
     workersDev: true,
     // Every 5 minutes: settle orders still waiting for payment, and keep StoreHub in step (src/ops/scheduled.server.ts).
