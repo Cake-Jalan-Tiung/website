@@ -17,19 +17,23 @@ async function call(method, path, body) {
   const text = body === undefined ? '' : JSON.stringify(body);
   const timestamp = String(Date.now());
   const signature = createHmac('sha256', secret).update(`${timestamp}\r\n${method}\r\n${path}\r\n\r\n${text}`).digest('hex');
+  const requestId = randomUUID();
   const response = await fetch(host + path, {
     method,
-    headers: {Authorization: `hmac ${key}:${timestamp}:${signature}`, Market: 'MY', 'Request-ID': randomUUID(), 'Content-Type': 'application/json'},
+    headers: {Authorization: `hmac ${key}:${timestamp}:${signature}`, Market: 'MY', 'Request-ID': requestId, 'Content-Type': 'application/json'},
     body: text || undefined,
   });
   const reply = await response.text();
-  return {status: response.status, body: reply ? JSON.parse(reply) : null};
+  // What Lalamove's support asks for when a call fails: our Request-ID and their gateway's ray id.
+  const trace = `Request-ID ${requestId}, waf-ray-id ${response.headers.get('waf-ray-id') ?? 'none'}, ${new Date().toISOString()}`;
+  return {status: response.status, body: reply ? JSON.parse(reply) : null, trace};
 }
 
 console.log(`Host: ${host}`);
 const cities = await call('GET', '/v3/cities');
 if (cities.status !== 200) {
   console.error(`GET /v3/cities answered ${cities.status}:`, JSON.stringify(cities.body));
+  console.error(cities.trace);
   process.exit(1);
 }
 for (const city of cities.body.data ?? []) {
@@ -46,4 +50,5 @@ if (pin) {
   ];
   const quote = await call('POST', '/v3/quotations', {data: {serviceType: 'MOTORCYCLE', language: 'en_MY', stops}});
   console.log(`\nMOTORCYCLE, 3 km north: ${quote.status}`, JSON.stringify(quote.body?.data?.priceBreakdown ?? quote.body));
+  if (quote.status !== 201 && quote.status !== 200) console.error(quote.trace);
 }
